@@ -14,6 +14,10 @@
     <img src="https://img.shields.io/badge/Google_Cloud-4285F4?style=for-the-badge&logo=google-cloud&logoColor=white" />
     <img src="https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white" />
   </div>
+  <br>
+  <a href="https://spacecraft-autonomy-222404104450.us-central1.run.app">
+    <img src="https://img.shields.io/badge/🚀_Live_Mission_Control_API-Online_Now-00F0FF?style=for-the-badge" alt="Live Demo" />
+  </a>
 </div>
 
 <br>
