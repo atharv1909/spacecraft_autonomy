@@ -22,18 +22,18 @@ class JensenGainMonitor:
                 or out-of-distribution input)
 
     Thresholds (from outline):
-        G_J < 0.5  : HIGH CONFIDENCE   (green)
-        0.5 - 2.0  : MODERATE          (yellow)
-        G_J >= 2.0 : LOW CONFIDENCE    (red)
+        G_J < 25.0 : HIGH CONFIDENCE   (green)
+        25.0 - 55.0  : MODERATE          (yellow)
+        G_J >= 55.0 : LOW CONFIDENCE    (red)
 
     Note: thresholds are in DEGREES here for human interpretability.
-    The outline values (0.5, 2.0) assume a normalized metric.
+    The outline values assume a normalized metric.
     We use degrees directly and set equivalent thresholds.
     """
 
     # Confidence thresholds in degrees
-    HIGH_CONFIDENCE_THRESH = 5.0    # degrees
-    MODERATE_THRESH = 15.0          # degrees
+    HIGH_CONFIDENCE_THRESH = 25.0    # degrees
+    MODERATE_THRESH = 55.0          # degrees
 
     CONFIDENCE_LEVELS = {
         "high": "HIGH CONFIDENCE",

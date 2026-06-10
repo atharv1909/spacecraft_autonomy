@@ -1,0 +1,16 @@
+.git
+.gitattributes
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.venv
+venv
+env
+node_modules
+.env
+*.log
+deploy/
+.mypy_cache
+.idea
+.vscode

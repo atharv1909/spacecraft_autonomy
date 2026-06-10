@@ -87,21 +87,35 @@ class PerceptionAgent:
 
     def _load_model(self, model_path: str):
         import torch
-        from perception.models.pose_model import SpacecraftPoseModel
 
         checkpoint = torch.load(model_path, map_location='cpu',
                                 weights_only=False)
 
         cfg = checkpoint.get('cfg', {})
+        model_class = checkpoint.get('model_class', 'SpacecraftPoseModel')
         backbone = cfg.get('backbone', 'efficientnet_b3')
 
-        self._model = SpacecraftPoseModel(
-            backbone_name=backbone,
-            pretrained=False
-        )
+        if model_class == 'PoseNet_ResNet50':
+            from perception.models.pose_model import PoseNet_ResNet50
+            self._model = PoseNet_ResNet50(pretrained=False)
+            backbone = 'resnet50'
+        else:
+            from perception.models.pose_model import SpacecraftPoseModel
+            self._model = SpacecraftPoseModel(
+                backbone_name=backbone,
+                pretrained=False
+            )
+
         self._model.load_state_dict(checkpoint['state_dict'])
         self._model.eval()
 
+        self._norm_mean = cfg.get('norm_mean_synth', [0.485, 0.456, 0.406])
+        self._norm_std = cfg.get('norm_std_synth', [0.229, 0.224, 0.225])
+        
+        if 'norm_mean_real' in cfg and 'norm_std_real' in cfg:
+            self._norm_mean_real = cfg['norm_mean_real']
+            self._norm_std_real = cfg['norm_std_real']
+            
         self._img_size = cfg.get('img_size', 224)
         self._device = 'cpu'
         self._model.to(self._device)
@@ -123,12 +137,20 @@ class PerceptionAgent:
             import torch
             import torchvision.transforms as T
 
+            mean_intensity = image.mean()
+            if hasattr(self, '_norm_mean_real') and mean_intensity < 0.25:
+                # Real images (SunLAMP) are very dark, mostly black space
+                norm_m = self._norm_mean_real
+                norm_s = self._norm_std_real
+            else:
+                norm_m = self._norm_mean
+                norm_s = self._norm_std
+
             transform = T.Compose([
                 T.ToPILImage(),
                 T.Resize((self._img_size, self._img_size)),
                 T.ToTensor(),
-                T.Normalize(mean=[0.485, 0.456, 0.406],
-                            std=[0.229, 0.224, 0.225])
+                T.Normalize(mean=norm_m, std=norm_s)
             ])
 
             if image.ndim == 2:

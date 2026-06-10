@@ -48,3 +48,60 @@ class SpacecraftPoseModel(nn.Module):
         # Normalize quaternion to unit length
         quat = quat / (quat.norm(dim=1, keepdim=True) + 1e-8)
         return quat, trans
+
+
+class PoolAndFlatten(nn.Module):
+    """
+    Helper layer to perform adaptive average pooling and flatten the output.
+    """
+    def forward(self, x):
+        return torch.flatten(nn.functional.adaptive_avg_pool2d(x, (1, 1)), 1)
+
+
+class PoseNet_ResNet50(nn.Module):
+    """
+    ResNet-50 backbone with custom neck and heads.
+    Matches the 101MB checkpoint architecture exactly.
+    """
+
+    def __init__(self, pretrained: bool = False):
+        super().__init__()
+        import torchvision.models as models
+
+        # Load ResNet-50 backbone (without average pooling and fc layers)
+        resnet = models.resnet50(weights=models.ResNet50_Weights.DEFAULT if pretrained else None)
+        self.backbone = nn.Sequential(*list(resnet.children())[:-2])
+
+        # Custom Neck
+        self.neck = nn.Sequential(
+            PoolAndFlatten(),
+            nn.Linear(2048, 1024),
+            nn.BatchNorm1d(1024),
+            nn.SiLU(),
+            nn.Dropout(0.3),
+            nn.Linear(1024, 512),
+            nn.BatchNorm1d(512),
+            nn.SiLU()
+        )
+
+        # Dual output heads
+        self.quat_head = nn.Sequential(
+            nn.Linear(512, 256),
+            nn.SiLU(),
+            nn.Linear(256, 4)
+        )
+
+        self.trans_head = nn.Sequential(
+            nn.Linear(512, 256),
+            nn.SiLU(),
+            nn.Linear(256, 3)
+        )
+
+    def forward(self, x):
+        features = self.backbone(x)
+        features = self.neck(features)
+        quat = self.quat_head(features)
+        trans = self.trans_head(features)
+        # Normalize quaternion to unit length
+        quat = quat / (quat.norm(dim=1, keepdim=True) + 1e-8)
+        return quat, trans
