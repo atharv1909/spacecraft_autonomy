@@ -1,305 +1,482 @@
-// src/components/sections/PerceptionSection.tsx
-import { useState, useRef } from "react";
-import { useMissionControl } from "../../hooks/useMissionControl";
-import { useActiveFlightStore } from "../../hooks/useActiveFlightState";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useMissionControl } from "@/hooks/useMissionControl";
+import { processPerceptionFrame } from "@/lib/api";
+import {
+  fetchPerceptionHistory,
+  fetchThresholds,
+  setFrameInterval,
+  type PerceptionFrame,
+  type Thresholds,
+} from "@/lib/armstrong";
+import {
+  ConformalCurveChart,
+  JensenGainHistoryChart,
+  OodHistoryChart,
+  RangeHistoryChart,
+} from "@/components/charts/TelemetryCharts";
+import { Reveal } from "@/components/motion/Reveal";
 
+/**
+ * The input stage of the whole system.
+ *
+ * A frame goes in; a 6-DoF pose and a calibrated uncertainty come out. Every
+ * other number on this dashboard is downstream of this one call, which is why
+ * it leads the page.
+ *
+ * Nothing here carries a fallback value. Before a frame is processed the
+ * readouts say so — a stand-in number would be indistinguishable from a real
+ * measurement, and this is the screen where that distinction matters most.
+ */
 export function PerceptionSection() {
-  const { modelStatus } = useMissionControl();
-  const {
-    activePresetId,
-    activeFlightState,
-    isProcessing,
-    selectPreset,
-    processCustomFile,
-  } = useActiveFlightStore();
-
+  const { latest, modelStatus } = useMissionControl();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
 
-  const state = activeFlightState;
-  const currentImgUrl = state?.imageUrl || "/test-images/test1.jpeg";
+  const [inferencing, setInferencing] = useState(false);
+  const [customImage, setCustomImage] = useState<string | null>(null);
+  const [imageName, setImageName] = useState<string | null>(null);
+  const [lastInferenceMs, setLastInferenceMs] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
 
-  const t = state?.pose.t ?? [0.0201, 0.0181, 1.411];
-  const q = state?.pose.q ?? [0.8861, 0.3592, -0.1261, -0.2643];
-  const jg = state?.uncertainty.quotientJensenGainDeg ?? 1.84;
-  const oodDist = state?.uncertainty.oodDistance ?? 18.18;
-  const calibBound = state?.uncertainty.calibratedBoundDeg ?? 4.8;
-  const confLevel = state?.uncertainty.confidenceLevel ?? "high";
-  const isGkValid = state?.gatekeeper.isValid ?? true;
-  const gkConf = state?.gatekeeper.confidence ?? 0.9998;
-  const gkLogit = state?.gatekeeper.logit ?? 8.30;
-  const gkReason = state?.gatekeeper.reason ?? null;
-  const gkLatency = state?.gatekeeper.latencyMs ?? 95.0;
+  const [frames, setFrames] = useState<PerceptionFrame[]>([]);
+  const [thresholds, setThresholds] = useState<Thresholds | null>(null);
+  const [interval, setIntervalS] = useState<number | null>(null);
+  const [intervalText, setIntervalText] = useState("");
 
-  const rangeM = state?.pose.rangeM ?? 1.411;
-  const losAngleDeg = state?.pose.losAngleDeg ?? 1.10;
-  const coneMarginDeg = state?.pose.coneMarginDeg ?? 18.90;
-  const isInCone = state?.pose.inCone ?? true;
-  const transverseMm = state?.pose.transverseOffsetMm ?? 27.0;
+  const p = latest.perception;
 
-  const handleSelectPreset = async (presetId: string) => {
-    setUploadStatus(`Running real PyTorch inference on ${presetId}.jpeg...`);
-    await selectPreset(presetId);
-    setUploadStatus(`PyTorch inference complete for ${presetId}.jpeg ✓`);
-    setTimeout(() => setUploadStatus(null), 3000);
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploadStatus(`Uploading ${file.name} to PyTorch Vision Pipeline...`);
-    const res = await processCustomFile(file);
-    if (res) {
-      setUploadStatus(`Inference complete for ${file.name} ✓`);
-    } else {
-      setUploadStatus(`Failed to process ${file.name}`);
+  const loadHistory = useCallback(async () => {
+    try {
+      const res = await fetchPerceptionHistory(120);
+      setFrames(res.frames);
+      setIntervalS(res.frame_interval_s);
+      setIntervalText(res.frame_interval_s != null ? String(res.frame_interval_s) : "");
+    } catch {
+      /* history is for plotting; a failed poll is not worth surfacing */
     }
-    setTimeout(() => setUploadStatus(null), 4000);
+  }, []);
+
+  useEffect(() => {
+    fetchThresholds().then(setThresholds).catch(() => setThresholds(null));
+  }, []);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory, p?.timestamp]);
+
+  const submitFrame = useCallback(
+    async (file: File) => {
+      setError(null);
+      setImageName(file.name);
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const b64 = reader.result as string;
+        setCustomImage(b64);
+        setInferencing(true);
+        const t0 = performance.now();
+        try {
+          const res = await processPerceptionFrame(b64);
+          setLastInferenceMs(
+            typeof res?.inference_ms === "number" ? res.inference_ms : performance.now() - t0,
+          );
+          await loadHistory();
+        } catch (err: any) {
+          setError(err?.message || "The perception agent could not process this frame.");
+        } finally {
+          setInferencing(false);
+        }
+      };
+      reader.onerror = () => setError("That file could not be read.");
+      reader.readAsDataURL(file);
+    },
+    [loadHistory],
+  );
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) submitFrame(file);
   };
+
+  const hasPose = Boolean(p && Array.isArray(p.t) && p.t.length >= 3);
 
   return (
-    <div className="space-y-6">
-      {/* Hidden File Input for Custom Image Upload */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        onChange={handleFileUpload}
-        className="hidden"
-      />
+    <div className="flex flex-col gap-gutter">
+      {/* ── Frame input ─────────────────────────────────────────── */}
+      <Reveal from="up">
+        <section className="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden shadow-sm">
+          <header className="px-container-padding py-3 border-b border-outline-variant bg-surface-container flex flex-wrap justify-between items-center gap-3">
+            <div>
+              <h2 className="font-label-caps text-label-caps text-ink-charcoal uppercase tracking-widest font-bold flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px] text-lacquer-red">photo_camera</span>
+                Submit an Optical Frame
+              </h2>
+              <p className="text-xs text-on-surface-variant mt-0.5">
+                Monocular image → 6-DoF pose → calibrated uncertainty. Everything below follows from this.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 font-mono text-[11px]">
+              {modelStatus?.info?.backbone && (
+                <span className="text-on-surface-variant">
+                  {modelStatus.info.backbone}
+                  {modelStatus.info.epoch != null ? ` · epoch ${modelStatus.info.epoch}` : ""}
+                </span>
+              )}
+              {lastInferenceMs != null && (
+                <span className="text-moss-accent font-bold">{lastInferenceMs.toFixed(1)} ms</span>
+              )}
+            </div>
+          </header>
 
-      {/* ── Top Header & Real-Time Testbench Selector ──────────────────────── */}
-      <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/60 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-700 font-bold">
-              100% Real PyTorch Vision Pipeline ({isProcessing ? "INFERENCE RUNNING..." : "IDLE / READY"})
-            </span>
-          </div>
-          <h2 className="text-lg font-bold text-ink-charcoal">
-            Layer 1 & 2 Neural Perception Subsystem
-          </h2>
-          <p className="text-xs text-on-surface-variant font-mono">
-            Execute live DINOv2 ViT Gatekeeper + ResNet-50 6-DoF PoseNet forward passes on desktop flight imagery.
-          </p>
-        </div>
-
-        {/* Live Preset Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
-          {[
-            { id: "test1", label: "test1.jpeg (1.41m Nominal)" },
-            { id: "test2", label: "test2.jpeg (2.86m Nominal)" },
-            { id: "test3", label: "test3.jpeg (1.75m Glare Tripwire)" },
-          ].map((preset) => (
-            <button
-              key={preset.id}
-              onClick={() => handleSelectPreset(preset.id)}
-              disabled={isProcessing}
-              className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
-                activePresetId === preset.id
-                  ? "bg-lacquer-red text-white border-lacquer-red shadow-md"
-                  : "bg-surface-container-lowest text-ink-charcoal border-outline-variant/60 hover:bg-surface-container"
+          <div className="grid lg:grid-cols-2">
+            {/* Dropzone / preview */}
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={onDrop}
+              className={`relative min-h-[300px] flex items-center justify-center border-b lg:border-b-0 lg:border-r border-outline-variant transition-colors ${
+                dragging ? "bg-lacquer-red/5" : "bg-surface-container-low"
               }`}
             >
-              <span className="material-symbols-outlined text-[15px]">
-                {preset.id === "test3" ? "wb_sunny" : "satellite_alt"}
-              </span>
-              {preset.label}
-            </button>
-          ))}
-
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isProcessing}
-            className="px-3 py-1.5 bg-ink-charcoal text-white rounded-lg text-xs font-mono font-bold hover:bg-black transition-all flex items-center gap-1 cursor-pointer shadow-xs"
-          >
-            <span className="material-symbols-outlined text-[15px]">upload_file</span>
-            Upload Custom
-          </button>
-        </div>
-      </div>
-
-      {uploadStatus && (
-        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs font-mono text-blue-900 flex items-center gap-2">
-          <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>
-          {uploadStatus}
-        </div>
-      )}
-
-      {/* ── Main Layout Grid ─────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-12 gap-gutter">
-        
-        {/* Left Column: Optical Feed & Visualizer */}
-        <div className="col-span-12 lg:col-span-7 flex flex-col gap-4">
-          <div className="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden shadow-xs">
-            <div className="px-4 py-2.5 border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
-              <span className="text-xs font-mono font-bold text-ink-charcoal flex items-center gap-2">
-                <span className="material-symbols-outlined text-[16px] text-lacquer-red">videocam</span>
-                Optical Feed: {state?.imageName || "test1.jpeg"} ({state?.resolution || "1600x1000"})
-              </span>
-              <span className="text-[11px] font-mono text-emerald-700 font-bold">
-                Latency: {state?.totalLatencyMs?.toFixed(1) || "120.0"}ms
-              </span>
-            </div>
-
-            <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
-              <img
-                src={currentImgUrl}
-                alt="Optical Feed"
-                className="w-full h-full object-contain"
-              />
-
-              {/* Boresight Overlay Grid */}
-              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                <div className="w-16 h-16 border border-emerald-500/40 rounded-full flex items-center justify-center">
-                  <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping"></div>
-                </div>
-                <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded text-[10px] font-mono text-white border border-white/10">
-                  Range: {rangeM.toFixed(3)}m | LOS: {losAngleDeg.toFixed(2)}°
-                </div>
-                <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded text-[10px] font-mono text-emerald-400 border border-white/10">
-                  {state?.gatekeeper.isValid ? "GATEKEEPER NOMINAL ✓" : "GATEKEEPER REJECTED ✗"}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 6-DoF Attitude & Position Cards */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs">
-              <span className="text-[10px] font-mono uppercase text-on-surface-variant font-bold">
-                Boresight Position Vector (t)
-              </span>
-              <div className="text-sm font-mono font-bold text-ink-charcoal mt-1">
-                [{t[0].toFixed(4)}, {t[1].toFixed(4)}, {t[2].toFixed(4)}] m
-              </div>
-              <div className="text-[11px] font-mono text-on-surface-variant mt-1">
-                Along-Track: {t[2].toFixed(3)}m | Radial: {t[1].toFixed(3)}m | Cross: {t[0].toFixed(3)}m
-              </div>
-            </div>
-
-            <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs">
-              <span className="text-[10px] font-mono uppercase text-on-surface-variant font-bold">
-                Attitude Quaternion (q)
-              </span>
-              <div className="text-sm font-mono font-bold text-ink-charcoal mt-1 truncate">
-                [{q[0].toFixed(4)}, {q[1].toFixed(4)}, {q[2].toFixed(4)}, {q[3].toFixed(4)}]
-              </div>
-              <div className="text-[11px] font-mono text-on-surface-variant mt-1">
-                Norm: {(Math.sqrt(q[0]**2 + q[1]**2 + q[2]**2 + q[3]**2)).toFixed(4)} (Unit SO(3))
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: Layer 1 Gatekeeper & Layer 2 Uncertainty */}
-        <div className="col-span-12 lg:col-span-5 flex flex-col gap-4">
-          
-          {/* Layer 1 Gatekeeper Card */}
-          <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs">
-            <div className="flex items-center justify-between pb-2 border-b border-outline-variant/60">
-              <span className="text-xs font-mono font-bold uppercase text-ink-charcoal flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[16px] text-lacquer-red">shield</span>
-                Layer 1: DINOv2 Gatekeeper ViT
-              </span>
-              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                isGkValid ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800 animate-pulse"
-              }`}>
-                {isGkValid ? "VALID FLIGHT IMAGE" : "REJECTED TRIPWIRE"}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mt-3">
-              <div>
-                <span className="text-[10px] font-mono text-on-surface-variant">Gatekeeper Confidence</span>
-                <div className="text-lg font-mono font-black text-ink-charcoal">
-                  {(gkConf * 100).toFixed(2)}%
-                </div>
-              </div>
-              <div>
-                <span className="text-[10px] font-mono text-on-surface-variant">Gatekeeper Logit</span>
-                <div className="text-lg font-mono font-black text-ink-charcoal">
-                  {gkLogit > 0 ? `+${gkLogit.toFixed(2)}` : gkLogit.toFixed(2)}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-3 p-2 bg-surface-container-low rounded text-[11px] font-mono text-on-surface-variant border border-outline-variant/40">
-              {gkReason ? (
-                <span className="text-red-700 font-bold">REASON: {gkReason}</span>
+              {customImage ? (
+                <>
+                  <img
+                    src={customImage}
+                    alt={imageName ? `Submitted frame: ${imageName}` : "Submitted frame"}
+                    className="max-h-[360px] w-full object-contain"
+                  />
+                  {hasPose && (
+                    <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end pointer-events-none">
+                      <span className="font-mono text-[10px] bg-ink-charcoal/75 text-white px-2 py-1 rounded">
+                        {imageName}
+                      </span>
+                      <span className="font-mono text-[10px] bg-ink-charcoal/75 text-white px-2 py-1 rounded">
+                        range {Math.hypot(p!.t[0]!, p!.t[1]!, p!.t[2]!).toFixed(2)} m
+                      </span>
+                    </div>
+                  )}
+                </>
               ) : (
-                <span className="text-emerald-700 font-bold">NOMINAL: Meta DINOv2 ViT-Small/14 validated under FPR@95 guarantee ({gkLatency.toFixed(1)}ms latency).</span>
+                <div className="text-center px-8 py-12 flex flex-col items-center gap-4">
+                  <span className="material-symbols-outlined text-[44px] text-outline-variant">
+                    add_photo_alternate
+                  </span>
+                  <div>
+                    <p className="font-headline-sm text-sm font-bold text-ink-charcoal mb-1">
+                      Drop a frame here
+                    </p>
+                    <p className="font-mono text-[11px] text-on-surface-variant max-w-xs leading-relaxed">
+                      No frame has been processed yet, so there is nothing to report downstream.
+                      Submit an image of the target to start the pipeline.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {inferencing && (
+                <div className="absolute inset-0 bg-paper-surface/80 backdrop-blur-sm flex flex-col items-center justify-center gap-2">
+                  <span className="material-symbols-outlined text-[28px] text-lacquer-red animate-spin">
+                    progress_activity
+                  </span>
+                  <span className="font-mono text-[11px] text-on-surface-variant">
+                    Running pose inference…
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Controls + pose output */}
+            <div className="p-container-padding flex flex-col gap-4">
+              <div className="flex flex-wrap gap-2.5">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={inferencing}
+                  className="bg-lacquer-red text-white font-label-caps text-[11px] uppercase tracking-widest px-5 py-3 rounded-lg hover:bg-primary transition-colors flex items-center gap-2 font-bold disabled:opacity-50 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">upload_file</span>
+                  {inferencing ? "Processing…" : customImage ? "Submit another frame" : "Choose a frame"}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) submitFrame(f);
+                    e.target.value = "";
+                  }}
+                  className="hidden"
+                />
+                {frames.length > 0 && (
+                  <span className="font-mono text-[11px] text-on-surface-variant self-center">
+                    {frames.length} frame{frames.length === 1 ? "" : "s"} processed
+                  </span>
+                )}
+              </div>
+
+              {error && (
+                <div className="p-3 rounded-lg bg-lacquer-red/10 border border-lacquer-red/40 font-mono text-[11px] text-lacquer-red">
+                  {error}
+                </div>
+              )}
+
+              <div className="font-label-caps text-[10px] uppercase tracking-wider text-on-surface-variant font-bold">
+                Estimated 6-DoF pose
+              </div>
+              <div className="grid sm:grid-cols-2 gap-3 font-mono text-xs">
+                <PoseBox
+                  label="Quaternion [w, x, y, z]"
+                  value={
+                    p?.quaternion?.length
+                      ? `[${p.quaternion.map((x) => Number(x).toFixed(4)).join(", ")}]`
+                      : null
+                  }
+                />
+                <PoseBox
+                  label="Translation [x, y, z] (m)"
+                  value={hasPose ? `[${p!.t.map((x) => Number(x).toFixed(3)).join(", ")}]` : null}
+                />
+              </div>
+
+              {/* The one input the camera cannot provide */}
+              <div className="pt-3 border-t border-outline-variant/50">
+                <label
+                  htmlFor="frame-interval"
+                  className="font-label-caps text-[10px] uppercase tracking-wider text-on-surface-variant font-bold block mb-1.5"
+                >
+                  Capture interval between frames
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="frame-interval"
+                    type="number"
+                    min={0.01}
+                    step={0.1}
+                    value={intervalText}
+                    placeholder="unset"
+                    onChange={(e) => setIntervalText(e.target.value)}
+                    onBlur={async () => {
+                      const parsed = intervalText.trim() === "" ? null : Number(intervalText);
+                      if (parsed !== null && (!Number.isFinite(parsed) || parsed <= 0)) {
+                        setIntervalText(interval != null ? String(interval) : "");
+                        return;
+                      }
+                      try {
+                        const r = await setFrameInterval(parsed);
+                        setIntervalS(r.frame_interval_s);
+                        await loadHistory();
+                      } catch {
+                        setIntervalText(interval != null ? String(interval) : "");
+                      }
+                    }}
+                    className="w-28 font-mono text-sm px-2.5 py-1.5 rounded border border-outline-variant bg-surface-container text-ink-charcoal focus:outline-none focus:border-lacquer-red"
+                  />
+                  <span className="font-mono text-[11px] text-on-surface-variant">seconds</span>
+                  <span
+                    className={`font-mono text-[10px] px-2 py-0.5 rounded font-bold ${
+                      interval != null && frames.length >= 2
+                        ? "bg-moss-accent/10 text-moss-accent"
+                        : "bg-surface-container text-on-surface-variant"
+                    }`}
+                  >
+                    {interval == null
+                      ? "velocity unavailable"
+                      : frames.length < 2
+                        ? "needs a second frame"
+                        : "velocity derived"}
+                  </span>
+                </div>
+                <p className="font-mono text-[10px] text-on-surface-variant mt-1.5 leading-relaxed">
+                  An image gives position, not motion. Declaring how far apart the frames were
+                  captured is what turns two pose fixes into a closing rate — upload timing would
+                  only measure how fast you clicked.
+                </p>
+              </div>
+
+              {thresholds?.hopf_anchors != null && (
+                <p className="font-mono text-[10px] text-on-surface-variant leading-relaxed">
+                  Rotation is scored against {thresholds.hopf_anchors} SO(3) anchors
+                  {thresholds.hopf_elevation && thresholds.hopf_inplane
+                    ? ` (${thresholds.hopf_elevation} directions × ${thresholds.hopf_inplane} in-plane)`
+                    : ""}
+                  . The spread across those anchors is the Jensen Gain.
+                </p>
               )}
             </div>
           </div>
+        </section>
+      </Reveal>
 
-          {/* Layer 2 Uncertainty & NASA Corridor Card */}
-          <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs">
-            <div className="flex items-center justify-between pb-2 border-b border-outline-variant/60">
-              <span className="text-xs font-mono font-bold uppercase text-ink-charcoal flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[16px] text-lacquer-red">donut_large</span>
-                Layer 2: Uncertainty & Corridor
-              </span>
-              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                isInCone ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
-              }`}>
-                {isInCone ? "INSIDE 20° CORRIDOR" : "CORRIDOR EXCEEDED"}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mt-3">
-              <div>
-                <span className="text-[10px] font-mono text-on-surface-variant">Quotient Jensen Gain</span>
-                <div className="text-lg font-mono font-black text-ink-charcoal">
-                  {jg.toFixed(2)}°
-                </div>
-              </div>
-              <div>
-                <span className="text-[10px] font-mono text-on-surface-variant">NASA 20° Margin</span>
-                <div className="text-lg font-mono font-black text-emerald-700">
-                  +{coneMarginDeg.toFixed(2)}°
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-3 space-y-1.5 text-[11px] font-mono text-on-surface-variant">
-              <div className="flex justify-between">
-                <span>Line-of-Sight Angle:</span>
-                <span className="font-bold text-ink-charcoal">{losAngleDeg.toFixed(2)}°</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Transverse Offset:</span>
-                <span className="font-bold text-ink-charcoal">{transverseMm.toFixed(1)} mm</span>
-              </div>
-              <div className="flex justify-between">
-                <span>OOD Mahalanobis Dist:</span>
-                <span className="font-bold text-ink-charcoal">{oodDist.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Conformal 95% Bound:</span>
-                <span className="font-bold text-ink-charcoal">±{calibBound.toFixed(1)}°</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Autonomous Multi-Agent Decision */}
-          <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs">
-            <span className="text-xs font-mono font-bold uppercase text-ink-charcoal flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[16px] text-lacquer-red">psychology</span>
-              Autonomous Multi-Agent Directive
-            </span>
-            <div className="mt-2 text-sm font-mono font-black text-lacquer-red">
-              ACTION: {state?.consensus.action || "STATION_KEEPING_HOLD"}
-            </div>
-            <div className="text-xs font-mono text-on-surface-variant mt-1">
-              {state?.consensus.fdirPath || "FDIR Level 1: Station-keep at current range."}
-            </div>
-          </div>
-
+      {/* ── Evidence channels ───────────────────────────────────── */}
+      <Reveal from="up" delay={70}>
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          <EvidenceCard
+            label="Jensen Gain Spread"
+            value={p?.jensen_gain != null ? `${p.jensen_gain.toFixed(2)}°` : null}
+            limit={
+              thresholds ? `trust limit ${thresholds.moderate_thresh_deg.toFixed(1)}°` : null
+            }
+            ok={
+              thresholds && p?.jensen_gain != null
+                ? p.jensen_gain < thresholds.moderate_thresh_deg
+                : null
+            }
+            footer={
+              p?.calibrated_error_bound_deg != null && thresholds?.conformal
+                ? `rotation error ≤ ${p.calibrated_error_bound_deg.toFixed(1)}° at ${(thresholds.conformal.coverage * 100).toFixed(0)}% coverage`
+                : null
+            }
+          />
+          <EvidenceCard
+            label="Physics Cross-Check"
+            value={p?.physics_residual_m != null ? `${p.physics_residual_m.toFixed(2)} m` : null}
+            limit={
+              thresholds?.physics_residual_threshold_m != null
+                ? `residual ≤ ${thresholds.physics_residual_threshold_m.toFixed(2)} m`
+                : null
+            }
+            ok={p?.physics_consistent ?? null}
+            footer={
+              p == null
+                ? null
+                : p.physics_consistent
+                  ? "CWH dynamics consistent"
+                  : "orbital jump violation"
+            }
+          />
+          <EvidenceCard
+            label="OOD Distance"
+            value={p?.ood_distance != null ? p.ood_distance.toFixed(2) : null}
+            limit={
+              thresholds?.ood_threshold_99th != null
+                ? `99th pct ≤ ${thresholds.ood_threshold_99th.toFixed(1)}`
+                : null
+            }
+            ok={p?.is_in_distribution ?? null}
+            footer={
+              p == null
+                ? null
+                : p.is_in_distribution
+                  ? "in-distribution"
+                  : "out-of-distribution — pose untrusted"
+            }
+          />
+          <EvidenceCard
+            label="Redundant PnP Solver"
+            value={
+              p?.cross_estimator_agreement == null
+                ? null
+                : p.cross_estimator_agreement
+                  ? "AGREE"
+                  : "DISAGREE"
+            }
+            limit={
+              p?.rotation_disagreement_deg != null
+                ? `geodesic Δ ${p.rotation_disagreement_deg.toFixed(1)}°`
+                : null
+            }
+            ok={p?.cross_estimator_agreement ?? null}
+            footer="ORB + EPnP, independent of the network"
+          />
         </div>
+      </Reveal>
 
+      {/* ── Graphs ──────────────────────────────────────────────── */}
+      <Reveal from="up" delay={120}>
+        <div className="grid lg:grid-cols-2 gap-4">
+          <JensenGainHistoryChart
+            frames={frames}
+            highThresh={thresholds?.high_confidence_thresh_deg ?? null}
+            moderateThresh={thresholds?.moderate_thresh_deg ?? null}
+          />
+          <ConformalCurveChart
+            bins={thresholds?.conformal?.bins ?? null}
+            coverage={thresholds?.conformal?.coverage ?? null}
+            liveJg={p?.jensen_gain ?? null}
+            liveBound={p?.calibrated_error_bound_deg ?? null}
+          />
+          <RangeHistoryChart frames={frames} />
+          <OodHistoryChart frames={frames} threshold={thresholds?.ood_threshold_99th ?? null} />
+        </div>
+      </Reveal>
+
+      {p?.confidence_label && (
+        <Reveal from="up" delay={160}>
+          <div
+            className={`p-4 rounded-xl border ${
+              p.confidence_level === "high"
+                ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-900"
+                : p.confidence_level === "moderate"
+                  ? "bg-amber-500/10 border-amber-500/40 text-amber-900"
+                  : "bg-lacquer-red/10 border-lacquer-red/40 text-lacquer-red"
+            }`}
+          >
+            <div className="font-label-caps text-xs font-bold uppercase mb-1">
+              Calibrated confidence assessment
+            </div>
+            <div className="text-xs leading-relaxed">{p.confidence_label}</div>
+          </div>
+        </Reveal>
+      )}
+    </div>
+  );
+}
+
+function PoseBox({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div className="bg-surface-container-low p-2.5 rounded border border-outline-variant/60">
+      <div className="text-[10px] text-on-surface-variant mb-1 uppercase font-bold">{label}</div>
+      <div className={value ? "text-ink-charcoal font-bold" : "text-on-surface-variant"}>
+        {value ?? "awaiting a frame"}
+      </div>
+    </div>
+  );
+}
+
+function EvidenceCard({
+  label,
+  value,
+  limit,
+  ok,
+  footer,
+}: {
+  label: string;
+  value: string | null;
+  limit: string | null;
+  ok: boolean | null;
+  footer: string | null;
+}) {
+  const tone =
+    ok == null ? "text-on-surface-variant" : ok ? "text-moss-accent" : "text-lacquer-red";
+  return (
+    <div className="bg-surface-container-lowest rounded-xl border border-outline-variant p-4 flex flex-col justify-between shadow-sm min-h-[142px]">
+      <div className="font-label-caps text-[10px] uppercase tracking-wider text-on-surface-variant font-bold">
+        {label}
+      </div>
+      <div className="flex-1 flex flex-col items-center justify-center my-2">
+        <span className={`font-mono text-2xl font-bold ${value ? tone : "text-outline-variant"}`}>
+          {value ?? "—"}
+        </span>
+        {limit && (
+          <span className="font-mono text-[10px] text-on-surface-variant mt-1 text-center">
+            {limit}
+          </span>
+        )}
+      </div>
+      <div
+        className={`text-[10px] font-mono p-1.5 rounded text-center ${
+          ok == null
+            ? "bg-surface-container text-on-surface-variant"
+            : ok
+              ? "bg-moss-accent/10 text-moss-accent"
+              : "bg-lacquer-red/10 text-lacquer-red"
+        }`}
+      >
+        {footer ?? "awaiting a frame"}
       </div>
     </div>
   );

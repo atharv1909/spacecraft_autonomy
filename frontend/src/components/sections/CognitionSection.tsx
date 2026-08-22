@@ -1,190 +1,206 @@
 import { useMissionControl } from "@/hooks/useMissionControl";
 
+/**
+ * The cognition agent's own output, and nothing else.
+ *
+ * The causal graph can only reason about subsystems it has actually been told
+ * about. Fed by a camera, that means the optical chain: pose ambiguity, novelty
+ * against the case library, and the action it recommends as a result. Where the
+ * agent has published no state for a field, the field says so — a plausible
+ * subsystem cascade drawn in a mission-control panel is indistinguishable from
+ * a measured one.
+ */
 export function CognitionSection() {
   const { latest } = useMissionControl();
-  const c = latest.cognition;
+  const c = latest.cognition as any;
+  const payload = c?.payload ?? c ?? null;
 
-  const anomaly = c?.anomaly_detected ?? false;
-  const novelty = c?.novelty_score ?? (anomaly ? 0.88 : 0.04);
-  const recAction = c?.recommended_action || (anomaly ? "HOLD_POSITION" : "PROCEED_SLOW");
-  const rootCause = c?.root_cause || (anomaly ? "thermal" : "nominal");
   const narrative =
-    c?.root_cause_narrative ||
-    (anomaly
-      ? `ROOT CAUSE: ${rootCause.toUpperCase()} anomaly detected. Upstream fault isolating to ${rootCause}. System recommended: ${recAction}.`
-      : "NOMINAL FLIGHT ENVELOPE: All 10,000-D hyperdimensional situation vectors in distribution. Zero subsystem anomalies detected.");
+    payload?.root_cause_narrative ??
+    (typeof payload?.explanation === "object"
+      ? payload.explanation?.narrative
+      : payload?.explanation) ??
+    null;
+  const rootCause = payload?.root_cause ?? null;
+  const anomaly = payload?.anomaly_detected ?? null;
+  const anomalyType = payload?.anomaly_type ?? null;
+  const novelty = payload?.novelty_score ?? null;
+  const recAction = payload?.recommended_action ?? null;
+  const actionConfidence = payload?.action_confidence ?? null;
+  const maxSimilarity = payload?.max_similarity ?? null;
 
-  // Subsystem states from HDC causal graph
-  const subStates = c?.subsystem_states || {
-    thermal: anomaly ? "failed" : "nominal",
-    power: anomaly ? "critical" : "nominal",
-    life_support: anomaly ? "degraded" : "nominal",
-  };
+  const subStates: Record<string, string> | null = payload?.subsystem_states ?? null;
+  const influence: Record<string, number> | null =
+    (typeof payload?.explanation === "object"
+      ? payload.explanation?.component_breakdown
+      : null) ??
+    payload?.component_breakdown ??
+    payload?.component_influence ??
+    null;
+  const heatmap =
+    typeof payload?.explanation === "object" ? payload.explanation?.similarity_heatmap : null;
 
-  const heatmap = c?.payload?.explanation?.similarity_heatmap || [
-    {
-      case_id: anomaly ? 4092 : 1024,
-      similarity_pct: anomaly ? 94.8 : 99.4,
-      outcome: "SUCCESS",
-      success_rate: anomaly ? 98 : 100,
-      action: anomaly ? "RECONFIGURE_POWER" : "PROCEED_SLOW",
-    },
-    {
-      case_id: anomaly ? 2180 : 1088,
-      similarity_pct: anomaly ? 68.2 : 96.1,
-      outcome: "SUCCESS",
-      success_rate: anomaly ? 92 : 99,
-      action: anomaly ? "HOLD_POSITION" : "PROCEED_NORMAL",
-    },
-  ];
+  if (!c) {
+    return (
+      <div className="bg-surface-container-lowest rounded-xl border border-outline-variant p-10 text-center flex flex-col items-center gap-3 shadow-sm">
+        <span className="material-symbols-outlined text-[40px] text-outline-variant">psychology</span>
+        <p className="font-mono text-xs text-on-surface-variant max-w-md leading-relaxed">
+          The cognition agent has not published a situation vector yet. It binds a hypervector once
+          a pose estimate reaches the bus.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-gutter">
-      {/* Causal Graph Root Cause Alert Banner */}
-      <div className={`border rounded-xl p-gutter relative overflow-hidden shadow-sm ${
-        anomaly ? "bg-surface-container-lowest border-lacquer-red/40" : "bg-surface-container-lowest border-emerald-500/40"
-      }`}>
-        <div className={`absolute inset-0 ${anomaly ? "bg-lacquer-red/5" : "bg-emerald-500/5"}`}></div>
+      {/* Root-cause banner */}
+      <div className="bg-surface-container-lowest border border-lacquer-red/40 rounded-xl p-gutter relative overflow-hidden shadow-sm">
+        <div className="absolute inset-0 bg-lacquer-red/5" />
         <div className="relative flex items-start gap-4">
-          <div className={`pt-1 ${anomaly ? "text-lacquer-red" : "text-emerald-700"}`}>
-            <span className="material-symbols-outlined text-3xl">
-              {anomaly ? "account_tree" : "check_circle"}
-            </span>
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-3 mb-1">
-              <span className={`font-label-caps text-xs px-2 py-0.5 rounded font-bold uppercase ${
-                anomaly ? "bg-lacquer-red text-white" : "bg-emerald-700 text-white"
-              }`}>
-                {anomaly ? "ROOT-CAUSE GRAPH TRAVERSAL" : "HDC ASSOCIATIVE MEMORY: NOMINAL"}
+          <span className="material-symbols-outlined text-3xl text-lacquer-red pt-1">account_tree</span>
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-3 mb-1.5">
+              <span className="font-label-caps text-xs px-2 py-0.5 bg-lacquer-red text-white rounded font-bold">
+                Root-Cause Graph Traversal
               </span>
               <span className="text-xs font-mono text-on-surface-variant">
-                Novelty: {(novelty * 100).toFixed(1)}% | Status: {anomaly ? "ANOMALY ISOLATED" : "IN-DISTRIBUTION"}
+                {novelty != null ? `novelty ${(Number(novelty) * 100).toFixed(1)}%` : "novelty —"}
+                {" · "}
+                {anomaly == null ? "anomaly —" : anomaly ? "ANOMALY DETECTED" : "nominal"}
+                {anomalyType && anomalyType !== "none" ? ` · ${anomalyType.replace(/_/g, " ")}` : ""}
               </span>
             </div>
-            <h2 className="text-lg font-bold text-ink-charcoal mb-1">{narrative}</h2>
-            <p className="font-label-caps text-xs text-on-surface-variant">
-              {anomaly
-                ? `Causal graph directs intervention to upstream root (${rootCause.toUpperCase()}) rather than suppressing symptoms.`
-                : "10,000-dimensional situation vector aligns with nominal rendezvous flight corridor."}
-            </p>
+            <h2 className="text-base font-bold text-ink-charcoal leading-snug mb-1">
+              {narrative ?? "No causal narrative published for this situation."}
+            </h2>
+            {rootCause && (
+              <p className="font-label-caps text-xs text-on-surface-variant">
+                Intervention directed at the upstream root ({String(rootCause).toUpperCase()}) rather
+                than the downstream symptoms.
+              </p>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Subsystem Cascade Flow */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-        
-        {/* Step 1: Thermal */}
-        <div className={`w-full md:flex-1 bg-surface-container-lowest border rounded-xl p-4 relative shadow-sm ${
-          subStates.thermal !== "nominal" ? "border-lacquer-red/40" : "border-outline-variant/60"
-        }`}>
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="font-label-caps text-xs text-on-surface-variant uppercase font-bold">Thermal Subsystem</h3>
-            <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded uppercase ${
-              subStates.thermal !== "nominal" ? "text-lacquer-red bg-lacquer-red/10" : "text-emerald-700 bg-emerald-500/10"
-            }`}>
-              {subStates.thermal || "NOMINAL"}
-            </span>
-          </div>
-          <div className={`font-mono text-sm font-bold ${subStates.thermal !== "nominal" ? "text-lacquer-red" : "text-emerald-700"}`}>
-            {subStates.thermal !== "nominal" ? "RADIATOR LOOP 2: 0.4 bar/min LEAK" : "RADIATOR LOOP: 1.85 bar (NOMINAL)"}
-          </div>
-          <div className="text-[11px] text-on-surface-variant mt-1">
-            {subStates.thermal !== "nominal" ? "Status: Primary Root Trigger" : "Status: Optimal Heat Rejection"}
-          </div>
-        </div>
-
-        <div className="text-on-surface-variant/40 hidden md:block">
-          <span className="material-symbols-outlined text-xl">arrow_forward</span>
-        </div>
-
-        {/* Step 2: Power */}
-        <div className={`w-full md:flex-1 bg-surface-container-lowest border rounded-xl p-4 relative shadow-sm ${
-          subStates.power !== "nominal" ? "border-lacquer-red/30" : "border-outline-variant/60"
-        }`}>
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="font-label-caps text-xs text-on-surface-variant uppercase font-bold">Power Subsystem</h3>
-            <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded uppercase ${
-              subStates.power !== "nominal" ? "text-lacquer-red bg-lacquer-red/10" : "text-emerald-700 bg-emerald-500/10"
-            }`}>
-              {subStates.power || "NOMINAL"}
-            </span>
-          </div>
-          <div className={`font-mono text-sm font-bold ${subStates.power !== "nominal" ? "text-ink-charcoal" : "text-emerald-700"}`}>
-            {subStates.power !== "nominal" ? "SOLAR ARRAY BUS: 22.1V (SAG)" : "MAIN BUS: 28.4V (REGULATED)"}
-          </div>
-          <div className="text-[11px] text-on-surface-variant mt-1">
-            {subStates.power !== "nominal" ? "Coupling: Overheating throttle" : "Coupling: Nominal Power Flow"}
-          </div>
-        </div>
-
-        <div className="text-on-surface-variant/40 hidden md:block">
-          <span className="material-symbols-outlined text-xl">arrow_forward</span>
-        </div>
-
-        {/* Step 3: Life Support */}
-        <div className={`w-full md:flex-1 bg-surface-container-lowest border rounded-xl p-4 relative shadow-sm ${
-          subStates.life_support !== "nominal" ? "border-amber-500/30" : "border-outline-variant/60"
-        }`}>
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="font-label-caps text-xs text-on-surface-variant uppercase font-bold">Life Support (ECLSS)</h3>
-            <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded uppercase ${
-              subStates.life_support !== "nominal" ? "text-amber-700 bg-amber-500/10" : "text-emerald-700 bg-emerald-500/10"
-            }`}>
-              {subStates.life_support || "NOMINAL"}
-            </span>
-          </div>
-          <div className="font-mono text-sm font-bold text-ink-charcoal">
-            {subStates.life_support !== "nominal" ? "CABIN O2_PP: 18.2 kPa" : "CABIN O2_PP: 21.3 kPa (STABLE)"}
-          </div>
-          <div className="text-[11px] text-on-surface-variant mt-1">
-            {subStates.life_support !== "nominal" ? "Coupling: Power load shedding" : "Coupling: Environmental Envelope Normal"}
-          </div>
-        </div>
-      </div>
-
-      {/* HDC Similarity Memory & Explanation */}
-      <div className="grid grid-cols-12 gap-gutter">
-        <div className="col-span-12 lg:col-span-6 bg-surface-container-lowest border border-outline-variant rounded-xl p-5 shadow-sm">
-          <h3 className="font-label-caps text-xs text-ink-charcoal uppercase font-bold tracking-wider mb-4 flex items-center gap-2">
-            <span className="material-symbols-outlined text-[18px] text-lacquer-red">memory</span>
-            10,000-D Hyperdimensional Memory Retrieval
+      <div className="grid lg:grid-cols-2 gap-gutter">
+        {/* Recommendation */}
+        <div className="bg-surface-container-lowest rounded-xl border border-outline-variant p-gutter shadow-sm flex flex-col gap-3">
+          <h3 className="font-label-caps text-xs text-ink-charcoal uppercase font-bold tracking-wider flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px] text-lacquer-red">neurology</span>
+            Associative Memory Recall
           </h3>
+          <dl className="font-mono text-xs flex flex-col gap-1.5">
+            <Row label="Recommended action" value={recAction ? String(recAction).toUpperCase() : null} />
+            <Row
+              label="Action confidence"
+              value={actionConfidence != null ? `${(Number(actionConfidence) * 100).toFixed(1)}%` : null}
+            />
+            <Row
+              label="Closest case similarity"
+              value={maxSimilarity != null ? Number(maxSimilarity).toFixed(3) : null}
+            />
+            <Row label="Situation id" value={payload?.situation_id ?? null} />
+          </dl>
 
-          <div className="flex flex-col gap-3 font-mono text-xs">
-            {heatmap.map((item, idx) => (
-              <div key={idx} className="p-3 bg-surface-container-low rounded border border-outline-variant/40 flex justify-between items-center">
-                <div>
-                  <div className="font-bold text-ink-charcoal">Case #{item.case_id}: {item.action} Maneuver</div>
-                  <div className="text-[11px] text-on-surface-variant">Recommended Action: {item.action}</div>
+          {Array.isArray(heatmap) && heatmap.length > 0 && (
+            <div className="mt-1">
+              <div className="font-label-caps text-[10px] uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                Nearest cases
+              </div>
+              <div className="flex flex-col gap-1">
+                {heatmap.slice(0, 5).map((h: any) => (
+                  <div
+                    key={h.case_id}
+                    className="flex items-center justify-between gap-2 font-mono text-[11px] px-2.5 py-1.5 rounded bg-surface-container-low border border-outline-variant/40"
+                  >
+                    <span className="text-on-surface-variant">#{h.case_id}</span>
+                    <span className="text-ink-charcoal truncate">{h.action}</span>
+                    <span className="font-bold text-moss-accent">{h.similarity_pct}%</span>
+                    <span className="text-on-surface-variant">{h.outcome}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Component influence — a real bar chart of the agent's own weights */}
+        <div className="bg-surface-container-lowest rounded-xl border border-outline-variant p-gutter shadow-sm">
+          <h3 className="font-label-caps text-xs text-ink-charcoal uppercase font-bold tracking-wider mb-4 flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px] text-lacquer-red">insights</span>
+            Component Influence on the Decision
+          </h3>
+          {influence && Object.keys(influence).length > 0 ? (
+            <div className="flex flex-col gap-2.5">
+              {Object.entries(influence).map(([k, v]) => (
+                <div key={k} className="flex items-center gap-3">
+                  <span className="font-mono text-[11px] w-32 shrink-0 text-on-surface-variant capitalize">
+                    {k.replace(/_/g, " ")}
+                  </span>
+                  <div className="flex-1 h-2.5 rounded bg-surface-container-highest overflow-hidden">
+                    <div
+                      className="h-full bg-lacquer-red rounded transition-all duration-700"
+                      style={{ width: `${Math.min(100, Number(v))}%` }}
+                    />
+                  </div>
+                  <span className="font-mono text-[11px] font-bold w-10 text-right text-ink-charcoal">
+                    {Number(v).toFixed(0)}%
+                  </span>
                 </div>
-                <div className="text-right">
-                  <div className="font-bold text-emerald-700">{item.similarity_pct.toFixed(1)}% Match</div>
-                  <div className="text-[10px] text-on-surface-variant">Success Rate: {item.success_rate}%</div>
+              ))}
+            </div>
+          ) : (
+            <p className="font-mono text-[11px] text-on-surface-variant">
+              The agent has not published a component breakdown for this situation.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Subsystem states, only if the agent actually published them */}
+      {subStates && Object.keys(subStates).length > 0 && (
+        <div className="bg-surface-container-lowest rounded-xl border border-outline-variant p-gutter shadow-sm">
+          <h3 className="font-label-caps text-xs text-ink-charcoal uppercase font-bold tracking-wider mb-3">
+            Causal Graph Node States
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono text-xs">
+            {Object.entries(subStates).map(([node, state]) => (
+              <div
+                key={node}
+                className="p-3 rounded-lg border bg-surface-container-low border-outline-variant/50"
+              >
+                <div className="text-[10px] uppercase text-on-surface-variant">
+                  {node.replace(/_/g, " ")}
+                </div>
+                <div
+                  className={`font-bold mt-1 ${
+                    state === "nominal"
+                      ? "text-moss-accent"
+                      : state === "degraded"
+                        ? "text-amber-700"
+                        : "text-lacquer-red"
+                  }`}
+                >
+                  {String(state).toUpperCase()}
                 </div>
               </div>
             ))}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
 
-        <div className="col-span-12 lg:col-span-6 bg-surface-container-lowest border border-outline-variant rounded-xl p-5 shadow-sm flex flex-col justify-between">
-          <div>
-            <h3 className="font-label-caps text-xs text-ink-charcoal uppercase font-bold tracking-wider mb-4 flex items-center gap-2">
-              <span className="material-symbols-outlined text-[18px] text-lacquer-red">psychology</span>
-              Cognition Agent Output
-            </h3>
-            <div className="text-sm font-mono text-ink-charcoal leading-relaxed p-4 bg-surface-container-low rounded border border-outline-variant/40">
-              {c?.explanation || `Cognition engine evaluates 10,000-D situation vector against mission flight envelope. Anomaly score: ${(novelty * 100).toFixed(1)}%. Recommendation: ${recAction}.`}
-            </div>
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-outline-variant/60 flex justify-between items-center text-xs font-mono">
-            <span className="text-on-surface-variant">Selected Plan: <strong className="text-lacquer-red">{recAction}</strong></span>
-            <span className="text-emerald-700 font-bold">Confidence: {((1 - novelty) * 100).toFixed(1)}%</span>
-          </div>
-        </div>
-      </div>
+function Row({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div className="flex justify-between gap-3 border-b border-outline-variant/30 pb-1">
+      <dt className="text-on-surface-variant">{label}</dt>
+      <dd className={value ? "font-bold text-ink-charcoal text-right break-all" : "text-outline-variant"}>
+        {value ?? "not published"}
+      </dd>
     </div>
   );
 }

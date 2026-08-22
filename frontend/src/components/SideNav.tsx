@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { startOrchestrator, runScenario } from "@/lib/api";
 
 const BRAND_MARK = "/faraway-logo.png";
 
 export const NAV_SECTIONS = [
   { id: "section-hero", label: "Mission Hub", icon: "home" },
-  { id: "section-invariant", label: "Master Invariant", icon: "functions" },
-  { id: "section-recovery", label: "Recovery FDIR", icon: "published_with_changes" },
+  { id: "section-perception", label: "Optical Input", icon: "photo_camera" },
   { id: "section-overview", label: "Overview", icon: "dashboard" },
-  { id: "section-perception", label: "Perception", icon: "visibility" },
   { id: "section-cognition", label: "Cognition", icon: "psychology" },
   { id: "section-action", label: "Action", icon: "precision_manufacturing" },
   { id: "section-orchestrator", label: "Orchestrator", icon: "settings_input_component" },
+  { id: "section-overrides", label: "Override Log", icon: "how_to_reg" },
   { id: "section-audit", label: "Audit Log", icon: "history_edu" },
   { id: "section-simulation", label: "Simulation", icon: "biotech" },
 ] as const;
@@ -19,21 +19,14 @@ export const NAV_SECTIONS = [
 export function SideNav() {
   const [activeSection, setActiveSection] = useState<string>("section-hero");
   const [initiating, setInitiating] = useState(false);
-  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
-      const dashboardEl = document.getElementById("section-dashboard");
-      if (dashboardEl) {
-        const dashboardTop = dashboardEl.offsetTop;
-        setVisible(window.scrollY >= dashboardTop - 250);
-      } else {
-        setVisible(window.scrollY > 400);
-      }
-
       const scrollPosition = window.scrollY + 120;
+      
       for (let i = NAV_SECTIONS.length - 1; i >= 0; i--) {
         const sec = NAV_SECTIONS[i];
+        if (!sec) continue;
         const el = document.getElementById(sec.id);
         if (el) {
           const top = el.offsetTop;
@@ -74,21 +67,20 @@ export function SideNav() {
   };
 
   return (
-    <nav className={`bg-paper-surface h-screen w-64 fixed left-0 top-0 border-r border-outline-variant/60 flex flex-col py-6 z-40 shadow-sm transition-all duration-300 ease-out ${
-      visible ? "translate-x-0 opacity-100 pointer-events-auto" : "-translate-x-full opacity-0 pointer-events-none"
-    }`}>
+    <nav className="bg-paper-surface h-screen w-64 fixed left-0 top-0 border-r border-outline-variant/60 flex flex-col py-6 z-40 shadow-sm">
       {/* Brand Header */}
       <div className="px-5 mb-6 flex flex-col items-start gap-3">
-        <button 
-          onClick={() => scrollToSection("section-hero")}
-          className="block hover:opacity-90 transition-opacity text-left cursor-pointer"
+        <Link
+          to="/"
+          className="block hover:opacity-90 transition-opacity text-left"
+          title="Back to programme overview"
         >
           <img
             alt="FARAWAY brand mark"
             className="w-44 h-auto rounded-md shadow-sm border border-outline-variant/60 hover:scale-102 transition-transform"
             src={BRAND_MARK}
           />
-        </button>
+        </Link>
         <div>
           <h1 className="font-headline-md text-headline-md font-bold text-lacquer-red tracking-widest uppercase">
             SYMBIOSIS
@@ -123,7 +115,14 @@ export function SideNav() {
       </div>
 
       {/* Action Footer */}
-      <div className="px-5 mt-auto pt-4 border-t border-outline-variant/40">
+      <div className="px-5 mt-auto pt-4 border-t border-outline-variant/40 flex flex-col gap-2">
+        <Link
+          to="/armstrong/pathway"
+          className="w-full bg-surface-container text-lacquer-red font-label-caps text-xs py-2.5 rounded-lg uppercase tracking-widest border border-lacquer-red/40 hover:bg-lacquer-red hover:text-white transition-all flex items-center justify-center gap-2 font-bold"
+        >
+          Armstrong Console
+          <span className="material-symbols-outlined text-[16px]">shield_with_heart</span>
+        </Link>
         <button
           onClick={handleInitiateProtocol}
           disabled={initiating}

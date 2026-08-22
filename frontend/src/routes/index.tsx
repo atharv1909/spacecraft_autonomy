@@ -1,335 +1,418 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { SideNav } from "@/components/SideNav";
-import { SakuraShader } from "@/components/SakuraShader";
-import { SystemHealthHeader } from "@/components/SystemHealthHeader";
-import { SectionDivider } from "@/components/SectionDivider";
-import { LandingHero } from "@/components/landing/LandingHero";
-import { LandingStory } from "@/components/landing/LandingStory";
-import { LandingNavbar } from "@/components/landing/LandingNavbar";
-import { UnifiedInvariantSection } from "@/components/sections/UnifiedInvariantSection";
-import { RecoveryWorkflowSection } from "@/components/sections/RecoveryWorkflowSection";
-import { OverviewSection } from "@/components/sections/OverviewSection";
-import { PerceptionSection } from "@/components/sections/PerceptionSection";
-import { CognitionSection } from "@/components/sections/CognitionSection";
-import { ActionSection } from "@/components/sections/ActionSection";
-import { OrchestratorSection } from "@/components/sections/OrchestratorSection";
-import { AuditSection } from "@/components/sections/AuditSection";
-import { SimulationSection } from "@/components/sections/SimulationSection";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
+import { OrbitalScene } from "@/components/landing/OrbitalScene";
+import { Backplate } from "@/components/landing/Backplate";
+import { Reveal, RevealHeading } from "@/components/motion/Reveal";
+import { TiltCard } from "@/components/motion/TiltCard";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Mission Control Dashboard — SYMBIOSIS" },
-      { name: "description", content: "Unified mission control for the SYMBIOSIS autonomous rendezvous program: perception, cognition, action, orchestration, audit, and simulation." },
-      { property: "og:title", content: "Mission Control Dashboard — SYMBIOSIS" },
-      { property: "og:description", content: "Unified mission control for the SYMBIOSIS autonomous rendezvous program: perception, cognition, action, orchestration, audit, and simulation." },
+      { title: "SYMBIOSIS — Autonomous Spacecraft Rendezvous" },
+      {
+        name: "description",
+        content:
+          "SYMBIOSIS couples conformalized pose estimation, hyperdimensional cognition and exact statistical safety bounds into an autonomous rendezvous stack that always leaves the last word to a human.",
+      },
+      { property: "og:title", content: "SYMBIOSIS — Autonomous Spacecraft Rendezvous" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: UnifiedDashboard,
+  component: Landing,
 });
 
-function UnifiedDashboard() {
-  const [showBackToTop, setShowBackToTop] = useState(false);
+const AGENTS = [
+  {
+    kanji: "視",
+    romaji: "SHI · SIGHT",
+    title: "Perception",
+    subtitle: "Conformalized 6-DoF Pose",
+    body:
+      "A ResNet-50 pose head is projected onto a 512-anchor Hopf grid. The spread across anchors — the Jensen Gain — is a calibrated, distribution-free measure of how badly the network is guessing, not a softmax pretending to be confidence.",
+    metric: "512 SO(3) anchors",
+  },
+  {
+    kanji: "知",
+    romaji: "CHI · KNOWING",
+    title: "Cognition",
+    subtitle: "10,000-D Associative Memory",
+    body:
+      "Every situation is bound into a 10,000-dimensional hypervector and matched against a case library. Novelty is a cosine distance, root cause is a traversal of a causal fault graph, and a human override is learned in one shot.",
+    metric: "D = 10,000",
+  },
+  {
+    kanji: "行",
+    romaji: "KOU · ACTION",
+    title: "Action",
+    subtitle: "Exact Safety Bounds",
+    body:
+      "Candidate maneuvers are propagated through a Clohessy-Wiltshire Monte-Carlo digital twin. Collision risk is reported as a Clopper-Pearson 99% exact upper bound — a number that holds without asymptotic hand-waving.",
+    metric: "99% exact bound",
+  },
+  {
+    kanji: "和",
+    romaji: "WA · HARMONY",
+    title: "Orchestrator",
+    subtitle: "Graduated Autonomy",
+    body:
+      "Weighted multi-agent voting, a NASA-style FDIR flight director, and the Armstrong Protocol. When evidence degrades the vehicle climbs the autonomy ladder toward the crew instead of guessing louder.",
+    metric: "4 override levels",
+  },
+];
+
+const GUARANTEES = [
+  {
+    value: "≤ 5%",
+    label: "Collision Upper Bound",
+    detail:
+      "Clopper-Pearson exact binomial bound over the Monte-Carlo ensemble. No maneuver commits above the flight limit without an explicit, logged human acknowledgement.",
+  },
+  {
+    value: "95%",
+    label: "Conformal Coverage",
+    detail:
+      "Distribution-free calibration on a held-out split. The reported error bound covers the true pose error at the stated rate, whatever the network happens to believe.",
+  },
+  {
+    value: "SHA-256",
+    label: "Tamper-Evident Ledger",
+    detail:
+      "Every decision — autonomous or human — is appended to a hash-chained log. Any post-hoc edit, delete or insert breaks the chain and is detectable on the ground.",
+  },
+];
+
+function Landing() {
+  const progressRef = useRef(0);
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    const checkScroll = () => {
-      if (window.scrollY > 400) {
-        setShowBackToTop(true);
-      } else {
-        setShowBackToTop(false);
-      }
+    const onScroll = () => {
+      const span = Math.max(1, window.innerHeight * 1.6);
+      progressRef.current = Math.min(1, window.scrollY / span);
+      setScrolled(window.scrollY > 40);
     };
-    window.addEventListener("scroll", checkScroll, { passive: true });
-    return () => window.removeEventListener("scroll", checkScroll);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const scrollTo = (id: string) => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth" });
-    }
-  };
-
   return (
-    <div className="font-body-md antialiased overflow-x-hidden min-h-screen relative bg-transparent selection:bg-lacquer-red selection:text-white">
-      {/* Full-Page Background Cherry Blossom Image */}
-      <div 
-        className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat pointer-events-none"
-        style={{
-          backgroundImage: "url('/sakura-bg.jpg')",
-          opacity: 0.50,
-          filter: "saturate(1.25) contrast(1.05)"
-        }}
-      />
-      
-      {/* Gentle Atmospheric Cream Wash */}
-      <div className="fixed inset-0 z-0 pointer-events-none bg-gradient-to-b from-paper-surface/40 via-paper-surface/25 to-paper-surface/65" />
+    <div className="relative min-h-screen bg-paper-surface text-ink-charcoal font-body-md selection:bg-lacquer-red selection:text-white overflow-x-hidden">
+      {/* Photographic backplate — carries its own scrim for type contrast */}
+      <Backplate />
 
-      {/* Sidebar Navigation */}
-      <SideNav />
-      <SakuraShader />
-
-      {/* Landing Page Hero Header & Animated Sakura Scene */}
-      <div id="top" className="relative z-20">
-        <LandingNavbar />
-        <LandingHero 
-          onLaunchClick={() => scrollTo("section-overview")}
-          onExploreClick={() => scrollTo("story")}
-        />
-        <LandingStory 
-          onLaunchClick={() => scrollTo("section-overview")}
-        />
+      {/* The moving bodies composite over the plate */}
+      <div className="fixed inset-0 z-[1] pointer-events-none">
+        <OrbitalScene scrollProgressRef={progressRef} className="w-full h-full" />
       </div>
 
-      {/* Main Content Area */}
-      <div id="section-dashboard" className="md:ml-64 relative z-10 min-h-screen flex flex-col">
-        {/* Sticky Global Mission Control Header */}
-        <SystemHealthHeader title="SYMBIOSIS Unified Mission Control" />
+      {/* Paper grain, kept faint so it reads as tooth rather than a grid */}
+      <div className="fixed inset-0 z-[2] pointer-events-none grid-bg opacity-[0.18]" />
 
-        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 max-w-[1600px] w-full mx-auto flex flex-col gap-10">
-          
-          {/* ========================================================
-              HERO / MISSION ARCHITECTURE INTRO
-             ======================================================== */}
-          <section id="section-hero" className="flex flex-col items-center justify-center pt-6 pb-4">
-            <div className="bg-paper-surface/92 backdrop-blur-md border border-outline-variant/80 rounded-2xl p-6 md:p-10 shadow-xl w-full relative overflow-hidden">
-              <div className="flex flex-col md:flex-row items-center gap-8 justify-between">
-                
-                <div className="flex-1 text-center md:text-left">
-                  <div className="inline-flex items-center gap-2 mb-3 px-3 py-1 rounded-full bg-lacquer-red/10 border border-lacquer-red/30">
-                    <span className="w-2 h-2 rounded-full bg-lacquer-red animate-pulse"></span>
-                    <span className="font-label-caps text-xs text-lacquer-red font-bold uppercase tracking-wider">
-                      SYMBIOSIS AUTONOMOUS RENDEZVOUS PROGRAM
-                    </span>
-                  </div>
+      {/* Slim top bar */}
+      <header
+        className={`fixed top-0 inset-x-0 z-40 transition-all duration-500 ${
+          scrolled
+            ? "bg-paper-surface/90 backdrop-blur-md border-b border-outline-variant/60 py-3"
+            : "bg-transparent py-6"
+        }`}
+      >
+        <div className="max-w-[1200px] mx-auto px-6 flex items-center justify-between">
+          <div className="flex items-baseline gap-3">
+            <span className="font-headline-md font-bold text-lacquer-red tracking-[0.28em] uppercase text-sm">
+              SYMBIOSIS
+            </span>
+            <span className="font-label-caps text-[10px] tracking-[0.2em] text-on-surface-variant uppercase hidden sm:inline">
+              共生 · Faraway Mission Systems
+            </span>
+          </div>
+          <nav className="flex items-center gap-2">
+            <Link
+              to="/mission"
+              className="font-label-caps text-[11px] uppercase tracking-widest px-4 py-2 rounded-lg border border-outline-variant text-ink-charcoal hover:bg-surface-container transition-colors"
+            >
+              Mission Control
+            </Link>
+            <Link
+              to="/armstrong/pathway"
+              className="font-label-caps text-[11px] uppercase tracking-widest px-4 py-2 rounded-lg bg-lacquer-red text-white hover:bg-primary transition-colors shadow-sm"
+            >
+              Armstrong Console
+            </Link>
+          </nav>
+        </div>
+      </header>
 
-                  <h1 className="font-headline-lg text-headline-lg md:text-[44px] md:leading-[52px] text-ink-charcoal uppercase tracking-tight mb-3 font-bold">
-                    Mission Control Center
-                  </h1>
+      <main className="relative z-10">
+        {/* ── HERO ───────────────────────────────────────────────── */}
+        <section className="min-h-screen flex flex-col justify-center px-6">
+          <div className="max-w-[1200px] mx-auto w-full pt-24">
+            <Reveal from="left" distance={40}>
+              <div className="inline-flex items-center gap-2.5 mb-8 px-3 py-1.5 rounded-full bg-paper-surface/80 backdrop-blur border border-lacquer-red/30">
+                <span className="w-2 h-2 rounded-full bg-lacquer-red animate-pulse" />
+                <span className="font-label-caps text-[10px] tracking-[0.22em] text-lacquer-red font-bold uppercase">
+                  Autonomous Rendezvous Program · Alpha-7
+                </span>
+              </div>
+            </Reveal>
 
-                  <p className="font-body-md text-ink-charcoal/90 text-sm md:text-base leading-relaxed mb-6 max-w-2xl">
-                    A multi-agent autonomous framework coupling <strong>Hyperdimensional Cognition</strong>, <strong>Conformalized Pose Estimation</strong>, and <strong>Clopper-Pearson Exact Safety Guarantees</strong> into a unified real-time operations environment.
+            <div className="flex items-start gap-8">
+              {/* Vertical Japanese rule */}
+              <Reveal from="down" delay={200} className="hidden lg:block shrink-0 pt-2">
+                <div
+                  className="font-headline-md text-lacquer-red/70 text-2xl tracking-[0.5em] leading-none"
+                  style={{ writingMode: "vertical-rl" }}
+                >
+                  共生軌道
+                </div>
+              </Reveal>
+
+              <div className="flex-1 min-w-0">
+                <RevealHeading
+                  text="Autonomy that knows"
+                  as="h1"
+                  className="font-headline-lg text-[13vw] sm:text-[9vw] lg:text-[86px] leading-[0.95] font-bold tracking-tight text-ink-charcoal"
+                />
+                <RevealHeading
+                  text="when to ask."
+                  as="h1"
+                  wordDelay={70}
+                  className="font-headline-lg text-[13vw] sm:text-[9vw] lg:text-[86px] leading-[0.95] font-bold tracking-tight text-lacquer-red mb-8"
+                />
+
+                <Reveal from="up" delay={480}>
+                  <p className="font-body-md text-base md:text-lg leading-relaxed max-w-2xl text-ink-charcoal/85 mb-3">
+                    A spacecraft closing on a tumbling target has no time to wait for the ground.
+                    SYMBIOSIS lets it decide — and hands control back the moment its own evidence
+                    stops being trustworthy.
                   </p>
+                  <p className="font-mono text-xs text-on-surface-variant max-w-2xl mb-10 leading-relaxed">
+                    Conformalized pose uncertainty · hyperdimensional causal reasoning ·
+                    Clopper-Pearson exact safety bounds · a tamper-evident record of every call made.
+                  </p>
+                </Reveal>
 
-                  {/* Quick Jump Buttons */}
-                  <div className="flex flex-wrap gap-2.5 justify-center md:justify-start">
-                    <button 
-                      onClick={() => scrollTo("section-invariant")} 
-                      className="bg-lacquer-red text-white text-xs font-label-caps px-4 py-2.5 rounded-lg hover:bg-primary transition-all shadow hover:shadow-md flex items-center gap-1.5 font-bold uppercase tracking-wider cursor-pointer"
+                <Reveal from="up" delay={620}>
+                  <div className="flex flex-wrap gap-3">
+                    <Link
+                      to="/mission"
+                      className="group inline-flex items-center gap-2.5 bg-lacquer-red text-white font-label-caps text-xs uppercase tracking-[0.18em] px-7 py-4 rounded-xl hover:bg-primary transition-all shadow-lg hover:shadow-xl active:scale-[0.98] font-bold"
                     >
-                      <span className="material-symbols-outlined text-[16px]">functions</span>
-                      Master Invariant
-                    </button>
-                    <button 
-                      onClick={() => scrollTo("section-recovery")} 
-                      className="bg-surface-container text-ink-charcoal text-xs font-label-caps px-4 py-2.5 rounded-lg border border-outline-variant hover:bg-surface-container-high transition-all flex items-center gap-1.5 font-bold uppercase tracking-wider cursor-pointer"
+                      Enter Mission Control
+                      <span className="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-1">
+                        arrow_forward
+                      </span>
+                    </Link>
+                    <a
+                      href="#architecture"
+                      className="inline-flex items-center gap-2.5 bg-paper-surface/85 backdrop-blur border border-outline-variant text-ink-charcoal font-label-caps text-xs uppercase tracking-[0.18em] px-7 py-4 rounded-xl hover:bg-surface-container transition-all font-bold"
                     >
-                      <span className="material-symbols-outlined text-[16px]">published_with_changes</span>
-                      Recovery Workflow
-                    </button>
-                    <button 
-                      onClick={() => scrollTo("section-overview")} 
-                      className="bg-surface-container text-ink-charcoal text-xs font-label-caps px-4 py-2.5 rounded-lg border border-outline-variant hover:bg-surface-container-high transition-all flex items-center gap-1.5 font-bold uppercase tracking-wider cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">dashboard</span>
-                      Live Telemetry
-                    </button>
-                    <button 
-                      onClick={() => scrollTo("section-perception")} 
-                      className="bg-surface-container text-ink-charcoal text-xs font-label-caps px-4 py-2.5 rounded-lg border border-outline-variant hover:bg-surface-container-high transition-all flex items-center gap-1.5 font-bold uppercase tracking-wider cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">visibility</span>
-                      Perception Feed
-                    </button>
-                    <button 
-                      onClick={() => scrollTo("section-orchestrator")} 
-                      className="bg-surface-container text-ink-charcoal text-xs font-label-caps px-4 py-2.5 rounded-lg border border-outline-variant hover:bg-surface-container-high transition-all flex items-center gap-1.5 font-bold uppercase tracking-wider cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">settings_input_component</span>
-                      Orchestrator
-                    </button>
-                    <button 
-                      onClick={() => scrollTo("section-simulation")} 
-                      className="bg-surface-container text-ink-charcoal text-xs font-label-caps px-4 py-2.5 rounded-lg border border-outline-variant hover:bg-surface-container-high transition-all flex items-center gap-1.5 font-bold uppercase tracking-wider cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">biotech</span>
-                      Testbed Runs
-                    </button>
+                      How it works
+                      <span className="material-symbols-outlined text-[18px]">expand_more</span>
+                    </a>
                   </div>
-                </div>
-
-                {/* Brand Badge */}
-                <div className="shrink-0 text-center">
-                  <div className="relative inline-block">
-                    <img 
-                      alt="FARAWAY Brand Mark Hero" 
-                      className="w-48 md:w-56 h-auto mx-auto rounded-lg shadow-lg border border-outline-variant/80 mb-2" 
-                      src="/faraway-logo.png" 
-                    />
-                    <div className="stamp font-label-caps text-label-caps bg-lacquer-red text-white px-2 py-0.5 rounded shadow-sm font-bold text-[10px] absolute -bottom-2 right-2">
-                      ALPHA-7 VERIFIED
-                    </div>
-                  </div>
-                </div>
-
+                </Reveal>
               </div>
             </div>
-          </section>
+          </div>
 
-          {/* ========================================================
-              SECTION 0: UNIFIED AEROSPACE MASTER INVARIANT (U-HCAM)
-             ======================================================== */}
-          <section id="section-invariant">
-            <SectionDivider 
-              icon="functions"
-              title="Unified Aerospace Master Invariant (U-HCAM Engine)"
-              subtitle="Hamilton-Jacobi-Bellman reachability, Fisher-Riemannian Quotient Manifold geometry SO(3)/G_sym, and Conformalized Chi-Square flight innovation gating"
-              badge="Master Invariant"
-            />
-            <UnifiedInvariantSection />
-          </section>
-
-          {/* ========================================================
-              SECTION 0.5: RECOVERABLE ERROR PATH & FDIR WORKFLOW
-             ======================================================== */}
-          <section id="section-recovery">
-            <SectionDivider 
-              icon="published_with_changes"
-              title="Autonomous Fault Recovery (FDIR Workflow)"
-              subtitle="Replacing generic abort errors with multi-stage deterministic recovery ladders, interactive Recharts telemetry verification, and real-time state re-convergence"
-              badge="Active Recovery"
-            />
-            <RecoveryWorkflowSection />
-          </section>
-
-          {/* ========================================================
-              SECTION 1: SYSTEM OVERVIEW & PROXIMITY TELEMETRY
-             ======================================================== */}
-          <section id="section-overview">
-            <SectionDivider 
-              icon="dashboard"
-              title="1. System Overview & Telemetry"
-              subtitle="Live CWH frame trajectory propagation, safety channel status, and 12-thruster allocation matrix"
-              badge="Live Bus"
-            />
-            <OverviewSection />
-          </section>
-
-          {/* ========================================================
-              SECTION 2: PERCEPTION & VISION STACK
-             ======================================================== */}
-          <section id="section-perception">
-            <SectionDivider 
-              icon="visibility"
-              title="2. Perception & Vision Pipeline"
-              subtitle="ResNet-50 6-DoF neural pose estimation, calibrated Jensen Gain uncertainty, and Stanford SPEED+ benchmark"
-              badge="Sensor Fusion"
-            />
-            <PerceptionSection />
-          </section>
-
-          {/* ========================================================
-              SECTION 3: COGNITION & CAUSAL REASONING
-             ======================================================== */}
-          <section id="section-cognition">
-            <SectionDivider 
-              icon="psychology"
-              title="3. Hyperdimensional Cognition & Causal Inference"
-              subtitle="10,000-D situation vector associative memory and root-cause fault graph traversal"
-              badge="HDC Engine"
-            />
-            <CognitionSection />
-          </section>
-
-          {/* ========================================================
-              SECTION 4: ACTION & TRAJECTORY SELECTION
-             ======================================================== */}
-          <section id="section-action">
-            <SectionDivider 
-              icon="precision_manufacturing"
-              title="4. Action Selection & Collision Probability"
-              subtitle="Clopper-Pearson 99% exact statistical safety upper bounds and 100-rollout Monte-Carlo digital twin"
-              badge="Exact Bounds"
-            />
-            <ActionSection />
-          </section>
-
-          {/* ========================================================
-              SECTION 5: AUTONOMY ORCHESTRATOR & ARBITRATION
-             ======================================================== */}
-          <section id="section-orchestrator">
-            <SectionDivider 
-              icon="settings_input_component"
-              title="5. Autonomy Consensus & Policy Arbitration"
-              subtitle="Multi-agent voting matrix, Graduated Autonomy Ladder, NASA FDIR flight director, and Armstrong overrides"
-              badge="FDIR Matrix"
-            />
-            <OrchestratorSection />
-          </section>
-
-          {/* ========================================================
-              SECTION 6: CRYPTOGRAPHIC AUDIT LOG
-             ======================================================== */}
-          <section id="section-audit">
-            <SectionDivider 
-              icon="history_edu"
-              title="6. Tamper-Evident Audit Ledger"
-              subtitle="SHA-256 cryptographic hash-chained decision records with independent ground verification"
-              badge="SHA-256 Chain"
-            />
-            <AuditSection />
-          </section>
-
-          {/* ========================================================
-              SECTION 7: ORBITAL SIMULATION TESTBED
-             ======================================================== */}
-          <section id="section-simulation">
-            <SectionDivider 
-              icon="biotech"
-              title="7. Orbital Simulation & Stress Testbed"
-              subtitle="Synthetic rendezvous scenarios across nominal approach, thermal failure cascade, perception glare, and multi-failure"
-              badge="Digital Twin"
-            />
-            <SimulationSection />
-          </section>
-
-          {/* ========================================================
-              FOOTER
-             ======================================================== */}
-          <footer className="mt-12 py-8 border-t border-outline-variant/60 text-center flex flex-col items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span className="font-headline-md font-bold text-lacquer-red text-sm tracking-wider uppercase">SYMBIOSIS</span>
-              <span className="text-on-surface-variant text-xs font-mono">• Autonomous Spacecraft Proximity Operations</span>
+          <Reveal from="up" delay={900} className="absolute bottom-8 inset-x-0">
+            <div className="flex flex-col items-center gap-2 text-on-surface-variant">
+              <span className="font-label-caps text-[10px] uppercase tracking-[0.3em]">Scroll</span>
+              <span className="w-[1px] h-10 bg-gradient-to-b from-outline-variant to-transparent" />
             </div>
-            <p className="text-xs font-mono text-on-surface-variant max-w-xl">
-              Equipped with Conformalized Confidence Guarantees, Clohessy-Wiltshire Dynamics, Hyperdimensional Causal Traversal, and SHA-256 Append-Only Decision Logging.
+          </Reveal>
+        </section>
+
+        {/* ── THE PROBLEM ────────────────────────────────────────── */}
+        <section className="px-6 py-32">
+          <div className="max-w-[1000px] mx-auto">
+            <Reveal from="left">
+              <span className="font-label-caps text-[10px] uppercase tracking-[0.3em] text-lacquer-red font-bold">
+                01 — The Constraint
+              </span>
+            </Reveal>
+            <RevealHeading
+              text="Light is too slow to fly a docking."
+              as="h2"
+              className="font-headline-lg text-[34px] md:text-[52px] leading-[1.08] font-bold tracking-tight text-ink-charcoal mt-4 mb-8"
+            />
+            <div className="grid md:grid-cols-2 gap-10">
+              <Reveal from="up" delay={120}>
+                <p className="text-base leading-relaxed text-ink-charcoal/85">
+                  At Mars distance a round trip to mission control costs up to 44 minutes. A
+                  rendezvous decision costs seconds. The vehicle either acts on its own reading of
+                  the world, or it does not act at all.
+                </p>
+              </Reveal>
+              <Reveal from="up" delay={240}>
+                <p className="text-base leading-relaxed text-ink-charcoal/85">
+                  So the interesting question is not whether the autonomy is confident. It is
+                  whether that confidence is <em>calibrated</em> — and what the vehicle does in the
+                  moment it discovers it is not.
+                </p>
+              </Reveal>
+            </div>
+          </div>
+        </section>
+
+        {/* ── THE FOUR AGENTS ────────────────────────────────────── */}
+        <section id="architecture" className="px-6 py-24 scroll-mt-24">
+          <div className="max-w-[1200px] mx-auto">
+            <Reveal from="left">
+              <span className="font-label-caps text-[10px] uppercase tracking-[0.3em] text-lacquer-red font-bold">
+                02 — The Architecture
+              </span>
+            </Reveal>
+            <RevealHeading
+              text="Four agents. One shared conscience."
+              as="h2"
+              className="font-headline-lg text-[34px] md:text-[52px] leading-[1.08] font-bold tracking-tight text-ink-charcoal mt-4 mb-14"
+            />
+
+            <div className="grid sm:grid-cols-2 gap-6">
+              {AGENTS.map((agent, i) => (
+                <Reveal key={agent.title} from={i % 2 === 0 ? "left" : "right"} delay={i * 90}>
+                  <TiltCard
+                    maxTilt={6}
+                    lift={14}
+                    className="h-full rounded-2xl bg-paper-surface/92 backdrop-blur-sm border border-outline-variant/80 p-8"
+                  >
+                    <div className="flex items-start justify-between mb-5">
+                      <div>
+                        <div className="font-label-caps text-[10px] uppercase tracking-[0.24em] text-on-surface-variant mb-2">
+                          {agent.romaji}
+                        </div>
+                        <h3 className="font-headline-md text-[26px] font-bold text-ink-charcoal leading-none">
+                          {agent.title}
+                        </h3>
+                        <div className="font-mono text-xs text-lacquer-red mt-1.5">
+                          {agent.subtitle}
+                        </div>
+                      </div>
+                      <span className="font-headline-lg text-[52px] leading-none text-lacquer-red/15 select-none">
+                        {agent.kanji}
+                      </span>
+                    </div>
+                    <p className="text-sm leading-relaxed text-ink-charcoal/80 mb-5">{agent.body}</p>
+                    <div className="pt-4 border-t border-outline-variant/50 font-mono text-xs font-bold text-moss-accent">
+                      {agent.metric}
+                    </div>
+                  </TiltCard>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── GUARANTEES ─────────────────────────────────────────── */}
+        <section className="px-6 py-24">
+          <div className="max-w-[1200px] mx-auto">
+            <Reveal from="left">
+              <span className="font-label-caps text-[10px] uppercase tracking-[0.3em] text-lacquer-red font-bold">
+                03 — What Is Actually Guaranteed
+              </span>
+            </Reveal>
+            <RevealHeading
+              text="Numbers that hold, not numbers that impress."
+              as="h2"
+              className="font-headline-lg text-[34px] md:text-[52px] leading-[1.08] font-bold tracking-tight text-ink-charcoal mt-4 mb-14"
+            />
+            <div className="grid md:grid-cols-3 gap-6">
+              {GUARANTEES.map((g, i) => (
+                <Reveal key={g.label} from="up" delay={i * 130}>
+                  <TiltCard
+                    maxTilt={5}
+                    lift={10}
+                    glare={false}
+                    className="h-full rounded-2xl bg-paper-surface/92 backdrop-blur-sm border border-outline-variant/80 p-8"
+                  >
+                    <div className="font-headline-lg text-[46px] leading-none font-bold text-lacquer-red mb-3 font-mono tracking-tight">
+                      {g.value}
+                    </div>
+                    <div className="font-label-caps text-[11px] uppercase tracking-[0.16em] font-bold text-ink-charcoal mb-3">
+                      {g.label}
+                    </div>
+                    <p className="text-sm leading-relaxed text-ink-charcoal/75">{g.detail}</p>
+                  </TiltCard>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── ARMSTRONG ──────────────────────────────────────────── */}
+        <section className="px-6 py-24">
+          <div className="max-w-[1200px] mx-auto">
+            <Reveal from="scale">
+              <div className="relative rounded-3xl border border-lacquer-red/25 bg-paper-surface/94 backdrop-blur-md p-10 md:p-16 overflow-hidden">
+                <div
+                  className="absolute -right-10 -top-10 font-headline-lg text-[200px] leading-none text-lacquer-red/[0.05] select-none pointer-events-none"
+                  aria-hidden
+                >
+                  人
+                </div>
+                <div className="relative">
+                  <span className="font-label-caps text-[10px] uppercase tracking-[0.3em] text-lacquer-red font-bold">
+                    04 — The Last Word
+                  </span>
+                  <RevealHeading
+                    text="The Armstrong Protocol"
+                    as="h2"
+                    className="font-headline-lg text-[34px] md:text-[52px] leading-[1.08] font-bold tracking-tight text-ink-charcoal mt-4 mb-6"
+                  />
+                  <p className="text-base leading-relaxed text-ink-charcoal/85 max-w-3xl mb-4">
+                    Named for the manual takeover of the Apollo 11 landing computer. When the
+                    evidence degrades past its calibrated threshold, the vehicle stops, states what
+                    it is unsure about in plain language, and offers the operator every recovery
+                    pathway its flight director can actually justify.
+                  </p>
+                  <p className="text-base leading-relaxed text-ink-charcoal/85 max-w-3xl mb-8">
+                    The operator picks a pathway, tunes its real physical parameters, and watches the
+                    predicted uncertainty, delta-V and collision bound recompute as they type. Nothing commits without a written rationale, and the rationale is chained
+                    into the ledger alongside the decision.
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    <Link
+                      to="/armstrong/pathway"
+                      className="group inline-flex items-center gap-2.5 bg-lacquer-red text-white font-label-caps text-xs uppercase tracking-[0.18em] px-7 py-4 rounded-xl hover:bg-primary transition-all shadow-lg active:scale-[0.98] font-bold"
+                    >
+                      Open the Console
+                      <span className="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-1">
+                        arrow_forward
+                      </span>
+                    </Link>
+                    <Link
+                      to="/mission"
+                      className="inline-flex items-center gap-2.5 border border-outline-variant text-ink-charcoal font-label-caps text-xs uppercase tracking-[0.18em] px-7 py-4 rounded-xl hover:bg-surface-container transition-all font-bold"
+                    >
+                      See Live Telemetry
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </Reveal>
+          </div>
+        </section>
+
+        <footer className="px-6 py-16 border-t border-outline-variant/50">
+          <div className="max-w-[1200px] mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
+            <div>
+              <div className="font-headline-md font-bold text-lacquer-red tracking-[0.28em] uppercase text-sm">
+                SYMBIOSIS
+              </div>
+              <p className="font-mono text-[11px] text-on-surface-variant mt-1">
+                Autonomous Spacecraft Proximity Operations · Faraway Mission Systems
+              </p>
+            </div>
+            <p className="font-mono text-[11px] text-on-surface-variant/70 max-w-md">
+              All telemetry rendered on this site is produced by the running simulation stack. No
+              value on any screen is a placeholder.
             </p>
-            <div className="text-[11px] font-mono text-on-surface-variant/60">
-              © Faraway Mission Systems — All telemetry channels live & verified.
-            </div>
-          </footer>
-
-        </main>
-      </div>
-
-      {/* Floating Back to Top Button */}
-      {showBackToTop && (
-        <button
-          onClick={scrollToTop}
-          className="fixed bottom-6 right-6 z-50 bg-lacquer-red text-white p-3 rounded-full shadow-xl hover:bg-primary transition-all flex items-center justify-center cursor-pointer active:scale-95 animate-fade-in"
-          title="Scroll to top"
-          aria-label="Scroll to top"
-        >
-          <span className="material-symbols-outlined text-[20px]">arrow_upward</span>
-        </button>
-      )}
+          </div>
+        </footer>
+      </main>
     </div>
   );
 }

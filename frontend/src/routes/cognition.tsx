@@ -8,7 +8,7 @@ export const Route = createFileRoute("/cognition")({
 function RedirectToCognition() {
   const navigate = useNavigate();
   useEffect(() => {
-    navigate({ to: "/", replace: true });
+    navigate({ to: "/mission", replace: true });
     setTimeout(() => {
       const el = document.getElementById("section-cognition");
       if (el) el.scrollIntoView({ behavior: "smooth" });

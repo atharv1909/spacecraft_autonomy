@@ -124,6 +124,7 @@
 @layer base {
   html {
     background-color: var(--color-paper-surface);
+    scroll-behavior: smooth;
   }
 
   body {
@@ -131,6 +132,11 @@
     color: var(--color-ink-charcoal);
     font-family: var(--font-body-md);
     -webkit-font-smoothing: antialiased;
+  }
+
+  /* Scroll margin so sticky header doesn't cover section anchors */
+  [id^="section-"] {
+    scroll-margin-top: 80px;
   }
 
   .material-symbols-outlined {

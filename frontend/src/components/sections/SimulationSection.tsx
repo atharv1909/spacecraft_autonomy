@@ -1,11 +1,36 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMissionControl } from "@/hooks/useMissionControl";
-import { runScenario } from "@/lib/api";
+import { runScenario, fetchScenarios, type ScenarioInfo } from "@/lib/api";
+
+/** Icon per scenario id — presentation only; every word of copy is the
+ *  scenario library's own name and description. */
+const ICONS: Record<string, { icon: string; iconColor: string; accent: string }> = {
+  nominal: { icon: "flight_takeoff", iconColor: "text-moss-accent", accent: "border-moss-accent/30" },
+  thermal: { icon: "thermostat", iconColor: "text-lacquer-red", accent: "border-lacquer-red/30" },
+  perception: { icon: "visibility_off", iconColor: "text-amber-700", accent: "border-amber-500/30" },
+  perfect_storm: { icon: "storm", iconColor: "text-rose-700", accent: "border-rose-500/30" },
+};
+
+const FALLBACK_ICON = { icon: "science", iconColor: "text-on-surface-variant", accent: "border-outline-variant" };
 
 export function SimulationSection() {
   const { status, refreshAll } = useMissionControl();
   const [runningScenario, setRunningScenario] = useState<string | null>(null);
   const [speed, setSpeed] = useState<number>(5.0);
+  const [catalogue, setCatalogue] = useState<ScenarioInfo[]>([]);
+
+  useEffect(() => {
+    fetchScenarios()
+      .then((r) => setCatalogue(r.scenarios ?? []))
+      .catch(() => setCatalogue([]));
+  }, []);
+
+  const scenarios = catalogue.map((sc) => ({
+    id: sc.id,
+    title: sc.name,
+    desc: sc.description ?? "No description published for this scenario.",
+    ...(ICONS[sc.id] ?? FALLBACK_ICON),
+  }));
 
   const activeScenario = status?.current_scenario;
   const isScenarioRunning = status?.scenario_running || runningScenario !== null;
@@ -21,41 +46,6 @@ export function SimulationSection() {
       setTimeout(() => setRunningScenario(null), 3000);
     }
   };
-
-  const scenarios = [
-    {
-      id: "nominal",
-      title: "Nominal Approach",
-      desc: "Standard nominal rendezvous trajectory from 50m to 10m range under clear lighting.",
-      icon: "flight_takeoff",
-      iconColor: "text-emerald-700",
-      accent: "border-emerald-500/30",
-    },
-    {
-      id: "thermal",
-      title: "Thermal Failure Cascade",
-      desc: "Radiator loop 2 failure leading to battery overheating and ECLSS load shedding. Tests root cause isolation.",
-      icon: "thermostat",
-      iconColor: "text-lacquer-red",
-      accent: "border-lacquer-red/30",
-    },
-    {
-      id: "perception",
-      title: "Perception Glare & OOD",
-      desc: "Solar glare flare and non-standard target geometry. Tests Mahalanobis OOD detector and PnP crosscheck.",
-      icon: "visibility_off",
-      iconColor: "text-amber-700",
-      accent: "border-amber-500/30",
-    },
-    {
-      id: "perfect_storm",
-      title: "Perfect Storm Multi-Failure",
-      desc: "Simultaneous thermal degradation, sensor occlusion, and communication dropout. Tests Armstrong Protocol.",
-      icon: "storm",
-      iconColor: "text-rose-700",
-      accent: "border-rose-500/30",
-    },
-  ];
 
   return (
     <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-gutter relative shadow-sm flex flex-col gap-6">
@@ -132,7 +122,7 @@ export function SimulationSection() {
       </div>
 
       <div className="p-4 bg-surface-container-low rounded-xl border border-outline-variant/60 font-mono text-xs text-on-surface-variant">
-        <strong className="text-ink-charcoal">Digital Twin Architecture:</strong> Scenarios synthesize Clohessy-Wiltshire state propagation, thermal dissipation dynamics, 10,000-D hyperdimensional situation vectors, and optical camera noise for full closed-loop multi-agent consensus testing.
+        <strong className="text-ink-charcoal">Digital Twin Architecture:</strong> Scenarios synthesise Clohessy-Wiltshire state propagation, 10,000-D hyperdimensional situation vectors, and optical camera noise for closed-loop multi-agent consensus testing. Scenario telemetry is simulated and labelled as such — it is not a measurement of a real vehicle.
       </div>
     </div>
   );

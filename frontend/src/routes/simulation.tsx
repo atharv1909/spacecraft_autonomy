@@ -8,7 +8,7 @@ export const Route = createFileRoute("/simulation")({
 function RedirectToSimulation() {
   const navigate = useNavigate();
   useEffect(() => {
-    navigate({ to: "/", replace: true });
+    navigate({ to: "/mission", replace: true });
     setTimeout(() => {
       const el = document.getElementById("section-simulation");
       if (el) el.scrollIntoView({ behavior: "smooth" });

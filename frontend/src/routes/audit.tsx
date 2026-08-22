@@ -8,7 +8,7 @@ export const Route = createFileRoute("/audit")({
 function RedirectToAudit() {
   const navigate = useNavigate();
   useEffect(() => {
-    navigate({ to: "/", replace: true });
+    navigate({ to: "/mission", replace: true });
     setTimeout(() => {
       const el = document.getElementById("section-audit");
       if (el) el.scrollIntoView({ behavior: "smooth" });

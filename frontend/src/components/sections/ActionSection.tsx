@@ -1,213 +1,353 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { useMissionControl } from "@/hooks/useMissionControl";
-import { sendHumanOverride } from "@/lib/api";
+import { fetchRecoveryOptions, ArmstrongError, type RecoveryOptionsResponse } from "@/lib/armstrong";
 
+/**
+ * Action selection and the flight envelope it was evaluated against.
+ *
+ * Two read-outs, side by side: what the action agent chose and the exact bound
+ * it carries, and the corridor geometry that bound was computed inside.
+ *
+ * Every row is a value the optical chain produced or that follows from it by
+ * computation. Actuation detail — which thrusters fire, for how long, at what
+ * propellant cost — is absent because a camera cannot observe it, and the
+ * status badges are derived from the numbers beside them rather than asserted,
+ * so a badge can never claim a margin the figures do not support.
+ */
 export function ActionSection() {
-  const { latest, refreshAll } = useMissionControl();
-  const [executingAction, setExecutingAction] = useState<string | null>(null);
-  const [appliedAction, setAppliedAction] = useState<string | null>(null);
+  const { latest } = useMissionControl();
+  const [env, setEnv] = useState<RecoveryOptionsResponse | null>(null);
 
   const a = latest.action;
-  const cons = latest.consensus;
-  const currentConsensusAction = cons?.final_action || a?.primary_action || "PROCEED_SLOW";
-  const primary = a?.primary_action || "PROCEED_SLOW";
-  const primaryScore = a?.primary_score ?? 0.88;
-  const primaryPCol = a?.collision_prob ?? 0.0002;
-  const primaryPCol99 = a?.collision_prob_upper_bound_99 ?? 0.0448;
 
-  // Build candidate actions table from real data
-  const candidateActions = [
-    {
-      name: primary,
-      score: primaryScore,
-      meanPCol: (primaryPCol * 100).toFixed(2) + "%",
-      bound99: (primaryPCol99 * 100).toFixed(2) + "%",
-      isPrimary: true,
-      description: `Collision probability will not exceed ${(primaryPCol99 * 100).toFixed(2)}%, with 99% confidence (Clopper-Pearson exact bound).`,
-    },
-    ...(a?.alternatives || [
-      { action: "HOLD_POSITION", score: 0.72, collision_prob: 0.0001, collision_prob_upper_bound_99: 0.0448 },
-      { action: "PROCEED_NORMAL", score: 0.65, collision_prob: 0.004, collision_prob_upper_bound_99: 0.065 },
-      { action: "RETREAT_SAFELY", score: 0.55, collision_prob: 0.0, collision_prob_upper_bound_99: 0.0448 },
-    ]).map((alt) => ({
-      name: alt.action,
-      score: alt.score,
-      meanPCol: ((alt.collision_prob ?? 0.001) * 100).toFixed(2) + "%",
-      bound99: ((alt.collision_prob_upper_bound_99 ?? 0.0448) * 100).toFixed(2) + "%",
-      isPrimary: false,
-      description: `Alternative candidate maneuver evaluated by digital twin ensemble. Score: ${alt.score.toFixed(2)}.`,
-    })),
-  ];
-
-  const handleApplyOverride = async (actionName: string) => {
-    setExecutingAction(actionName);
+  const load = useCallback(async () => {
     try {
-      await sendHumanOverride("modify", actionName.toLowerCase(), `Commander selected candidate maneuver ${actionName}`);
-      setAppliedAction(actionName);
-      await refreshAll();
-    } catch (err) {
-      console.error("Execute action error", err);
-    } finally {
-      setExecutingAction(null);
+      setEnv(await fetchRecoveryOptions());
+    } catch (e) {
+      if (e instanceof ArmstrongError && e.status === 409) setEnv(null);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    load();
+    const id = setInterval(load, 6000);
+    return () => clearInterval(id);
+  }, [load, latest.perception?.timestamp]);
+
+  if (!a?.primary_action) {
+    return (
+      <div className="bg-surface-container-lowest rounded-xl border border-outline-variant p-10 text-center flex flex-col items-center gap-3 shadow-sm">
+        <span className="material-symbols-outlined text-[40px] text-outline-variant">
+          precision_manufacturing
+        </span>
+        <p className="font-mono text-xs text-on-surface-variant max-w-md leading-relaxed">
+          The action agent has not evaluated a manoeuvre yet. It runs once a pose estimate and a
+          situation vector are both on the bus.
+        </p>
+      </div>
+    );
+  }
+
+  // The agent repeats the selected action inside its own alternatives list;
+  // collapse on name so each distinct manoeuvre appears exactly once.
+  const seen = new Set<string>([a.primary_action]);
+  const alternatives = (a.alternatives ?? []).filter((alt) => {
+    if (seen.has(alt.action)) return false;
+    seen.add(alt.action);
+    return true;
+  });
+
+  const limit = env?.collision_bound_limit ?? 0.05;
+  const bound = a.collision_prob_upper_bound_99;
+  const boundOk = bound != null && bound <= limit;
+
+  const fmtPct = (v: number | null | undefined, dp = 2) =>
+    v == null ? null : `${(v * 100).toFixed(dp)}%`;
+
+  const coneMargin =
+    env?.cone_margin_deg != null
+      ? `${env.cone_margin_deg > 0 ? "+" : ""}${env.cone_margin_deg.toFixed(2)}° (${
+          env.in_approach_cone ? "CORRIDOR CLEAR" : "CORRIDOR BREACH"
+        })`
+      : null;
+
+  const closingSpeed =
+    env?.velocity_observed && env.range_rate_mps != null
+      ? `${env.range_rate_mps.toFixed(3)} m/s (v_max = ${env.max_safe_velocity_mps.toFixed(3)} m/s)`
+      : null;
+
+  const kozStatus =
+    env?.range_m != null && env.koz_radius_m != null
+      ? env.range_m <= env.keepout_radius_m
+        ? "INSIDE KEEP-OUT SPHERE"
+        : env.range_m <= env.koz_radius_m
+          ? `PENETRATED (${env.range_m.toFixed(2)} m of ${env.koz_radius_m.toFixed(0)} m)`
+          : `CLEAR (${env.range_m.toFixed(2)} m of ${env.koz_radius_m.toFixed(0)} m)`
+      : null;
+
+  const camArmed = env?.cam_delta_v_mps?.some((v) => Math.abs(v) > 1e-9) ?? false;
+
+  const chartData = [
+    { name: a.primary_action, bound: bound, isPrimary: true },
+    ...alternatives.map((alt) => ({
+      name: alt.action,
+      bound: alt.collision_prob_upper_bound_99 ?? null,
+      isPrimary: false,
+    })),
+  ]
+    .filter((c) => c.bound != null)
+    .map((c) => ({
+      name: c.name.replace(/_/g, " "),
+      pct: Number(c.bound) * 100,
+      isPrimary: c.isPrimary,
+    }));
 
   return (
     <div className="flex flex-col gap-gutter">
-      <div className="grid grid-cols-12 gap-gutter min-h-[440px]">
-        
-        {/* Candidate Action Evaluation Table */}
-        <div className="col-span-12 xl:col-span-8 flex flex-col gap-4">
-          <div className="bg-surface-container-lowest rounded-xl border border-outline-variant flex flex-col h-full overflow-hidden p-gutter shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <h3 className="font-headline-md text-headline-md text-ink-charcoal font-bold">
-                  Monte-Carlo Digital Twin Candidate Evaluation
-                </h3>
-                <p className="text-xs text-on-surface-variant mt-0.5">
-                  100 CWH trajectory rollouts under Clopper-Pearson 99% exact statistical safety bounds.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono uppercase px-2.5 py-1 rounded bg-surface-container font-bold text-ink-charcoal">
-                  Active: <span className="text-lacquer-red font-bold">{currentConsensusAction}</span>
-                </span>
-              </div>
-            </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-gutter">
+        {/* ── Exact safety bounds ─────────────────────────────── */}
+        <Panel
+          title="Clopper-Pearson Exact Safety Bounds"
+          badge={
+            bound == null
+              ? { text: "AWAITING BOUND", tone: "neutral" }
+              : boundOk
+                ? { text: "WITHIN LIMITS", tone: "good" }
+                : { text: "EXCEEDS LIMITS", tone: "bad" }
+          }
+        >
+          <Row
+            label="Primary Action"
+            value={
+              a.primary_score != null
+                ? `${a.primary_action.toUpperCase()} (Score: ${a.primary_score.toFixed(2)})`
+                : a.primary_action.toUpperCase()
+            }
+            tone="good"
+          />
+          <Row
+            label="Collision Probability Upper Bound"
+            value={bound != null ? `≤ ${fmtPct(bound)} (99% Clopper-Pearson)` : null}
+            tone={boundOk ? "good" : "bad"}
+          />
+          <Row
+            label="Mission Success Probability"
+            value={fmtPct((a as { mission_success_prob?: number }).mission_success_prob, 1)}
+          />
+          <Row
+            label={`${env?.cone_half_angle_deg?.toFixed(0) ?? "20"}° LOS Approach Cone Margin`}
+            value={coneMargin}
+            tone={env?.in_approach_cone ? "good" : "bad"}
+          />
+          {alternatives.length === 0 ? (
+            <Row label="Alternative Actions" value={null} />
+          ) : (
+            alternatives.slice(0, 2).map((alt, i) => (
+              <Row
+                key={alt.action}
+                label={`Alternative Action #${i + 1}`}
+                value={
+                  alt.collision_prob_upper_bound_99 != null
+                    ? `${alt.action.toUpperCase()} (≤ ${fmtPct(alt.collision_prob_upper_bound_99)})`
+                    : alt.action.toUpperCase()
+                }
+              />
+            ))
+          )}
+        </Panel>
 
-            <div className="flex-1 overflow-auto rounded-lg border border-outline-variant bg-paper-surface">
-              <table className="w-full text-left text-xs font-mono">
-                <thead className="bg-surface-container border-b border-outline-variant sticky top-0">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold text-on-surface-variant uppercase">Action Directive</th>
-                    <th className="px-4 py-3 font-semibold text-on-surface-variant uppercase">Score</th>
-                    <th className="px-4 py-3 font-semibold text-on-surface-variant uppercase">Mean P(Col)</th>
-                    <th className="px-4 py-3 font-semibold text-lacquer-red uppercase font-bold">99% Exact Bound</th>
-                    <th className="px-4 py-3 font-semibold text-on-surface-variant uppercase">Semantic Safety Guarantee</th>
-                    <th className="px-4 py-3 font-semibold text-on-surface-variant uppercase text-right">Execute</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-outline-variant/40">
-                  {candidateActions.map((cAction, idx) => {
-                    const isExecuting = executingAction === cAction.name;
-                    const isCurrent = currentConsensusAction.toUpperCase() === cAction.name.toUpperCase() || appliedAction === cAction.name;
-
-                    return (
-                      <tr
-                        key={idx}
-                        className={`${
-                          isCurrent
-                            ? "bg-emerald-500/10 font-semibold"
-                            : cAction.isPrimary
-                            ? "bg-emerald-500/5 font-semibold"
-                            : "hover:bg-surface-container-low transition-colors"
-                        }`}
-                      >
-                        <td className="px-4 py-3 relative">
-                          {(isCurrent || cAction.isPrimary) && (
-                            <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${isCurrent ? "bg-lacquer-red" : "bg-emerald-600"}`}></div>
-                          )}
-                          <span className={`font-bold ${isCurrent ? "text-lacquer-red" : cAction.isPrimary ? "text-emerald-800" : "text-ink-charcoal"}`}>
-                            {cAction.name}
-                          </span>
-                          {isCurrent && (
-                            <span className="ml-2 text-[9px] uppercase px-1.5 py-0.5 rounded bg-lacquer-red text-white font-bold">
-                              ACTIVE
-                            </span>
-                          )}
-                          {!isCurrent && cAction.isPrimary && (
-                            <span className="ml-2 text-[9px] uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">
-                              Recommended
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-ink-charcoal font-bold">{cAction.score.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-on-surface-variant">{cAction.meanPCol}</td>
-                        <td className="px-4 py-3 text-lacquer-red font-bold flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[14px]">shield</span>
-                          ≤{cAction.bound99}
-                        </td>
-                        <td className="px-4 py-3 text-on-surface-variant text-[11px] max-w-[220px]">
-                          {cAction.description}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={() => handleApplyOverride(cAction.name)}
-                            disabled={isExecuting}
-                            className={`text-[10px] px-3 py-1.5 rounded border transition-all font-bold cursor-pointer ${
-                              isCurrent
-                                ? "bg-emerald-600 text-white border-emerald-700 shadow-sm"
-                                : "bg-surface-container border-outline-variant hover:border-lacquer-red hover:text-lacquer-red hover:bg-surface-container-high"
-                            }`}
-                          >
-                            {isExecuting ? "EXECUTING..." : isCurrent ? "ACTIVE ✓" : "EXECUTE"}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="mt-4 p-3 bg-surface-container-low rounded border border-outline-variant/40 text-xs font-mono text-on-surface-variant">
-              {a?.explanation || "Exact Clopper-Pearson 99% safety bound guarantees collision probability does not exceed statistical upper bound even under zero sample collisions."}
-            </div>
-          </div>
-        </div>
-
-        {/* Actuation Limits & Thruster Duty */}
-        <div className="col-span-12 xl:col-span-4 flex flex-col gap-4">
-          <div className="bg-surface-container-lowest rounded-xl border border-outline-variant p-gutter shadow-sm flex flex-col justify-between h-full">
-            <div>
-              <h3 className="font-label-caps text-xs text-ink-charcoal uppercase font-bold tracking-wider mb-4 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px] text-lacquer-red">speed</span>
-                Thruster Actuation Limits
-              </h3>
-
-              <div className="flex flex-col gap-4 font-mono text-xs">
-                <div>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-on-surface-variant">RCS Block Forward (+V-bar)</span>
-                    <span className="font-bold text-ink-charcoal">12.4 N</span>
-                  </div>
-                  <div className="w-full bg-surface-container h-2 rounded overflow-hidden">
-                    <div className="bg-moss-accent h-full w-[24%]"></div>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-on-surface-variant">RCS Block Aft (-V-bar)</span>
-                    <span className="font-bold text-ink-charcoal">0.0 N</span>
-                  </div>
-                  <div className="w-full bg-surface-container h-2 rounded overflow-hidden">
-                    <div className="bg-moss-accent h-full w-0"></div>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-on-surface-variant">Delta-V Budget Remaining</span>
-                    <span className="font-bold text-emerald-700">142.8 m/s</span>
-                  </div>
-                  <div className="w-full bg-surface-container h-2 rounded overflow-hidden">
-                    <div className="bg-emerald-600 h-full w-[82%]"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-3 bg-surface-container rounded border border-outline-variant/60 mt-4 text-[11px] font-mono">
-              <div className="font-bold text-ink-charcoal mb-1">Armstrong Override Level:</div>
-              <div className="text-on-surface-variant">
-                Autonomous closed-loop trajectory generation under active safety envelope constraints.
-              </div>
-            </div>
-          </div>
-        </div>
-
+        {/* ── Flight corridor & envelope ──────────────────────── */}
+        <Panel
+          title="RPO Flight Corridor & Envelope"
+          badge={
+            env == null
+              ? { text: "AWAITING FRAME", tone: "neutral" }
+              : env.tripwire_triggered
+                ? { text: "TRIPWIRE ACTIVE", tone: "bad" }
+                : { text: "ENVELOPE NOMINAL", tone: "good" }
+          }
+        >
+          <Row
+            label={`${env?.cone_half_angle_deg?.toFixed(0) ?? "20"}° LOS Approach Cone Margin`}
+            value={coneMargin}
+            tone={env?.in_approach_cone ? "good" : "bad"}
+          />
+          <Row
+            label="Relative Closing Speed (v_rel)"
+            value={closingSpeed}
+            hint={
+              env && !env.velocity_observed
+                ? "needs a second frame and a declared capture interval"
+                : undefined
+            }
+            tone={
+              env?.velocity_observed && env.range_rate_mps > env.max_safe_velocity_mps
+                ? "bad"
+                : "plain"
+            }
+          />
+          <Row label="Keep-Out Zone (KOZ) Status" value={kozStatus} />
+          <Row
+            label="Flight Phase"
+            value={env?.flight_phase ? env.flight_phase.replace(/_/g, " ") : null}
+          />
+          <Row
+            label="Passive Abort Corridor"
+            value={env == null ? null : camArmed ? "CAM ARMED" : "✓ CLEARED"}
+            tone={camArmed ? "bad" : "good"}
+          />
+          <Row
+            label="Trajectory Verification"
+            value={env?.n_monte_carlo ? `${env.n_monte_carlo} CWH Monte Carlo runs` : null}
+            tone="good"
+          />
+        </Panel>
       </div>
+
+      {env?.tripwire_triggered && env.tripwire_reason && (
+        <div className="p-3 rounded-lg bg-lacquer-red/10 border border-lacquer-red/40 font-mono text-[11px] text-lacquer-red">
+          {env.tripwire_reason}
+        </div>
+      )}
+
+      {/* ── Bound by candidate ──────────────────────────────── */}
+      {chartData.length > 0 && (
+        <div className="bg-surface-container-lowest rounded-xl border border-outline-variant p-gutter shadow-sm">
+          <div className="flex items-baseline justify-between gap-2 mb-3">
+            <h3 className="font-label-caps text-xs text-ink-charcoal uppercase font-bold tracking-wider">
+              Collision Bound by Candidate
+            </h3>
+            <span className="font-mono text-[10px] text-on-surface-variant">
+              flight limit {(limit * 100).toFixed(0)}%
+            </span>
+          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={chartData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+              <CartesianGrid stroke="rgba(0,0,0,0.07)" />
+              <XAxis
+                dataKey="name"
+                stroke="#564240"
+                tick={{ fontSize: 10, fontFamily: "JetBrains Mono, monospace", fill: "#564240" }}
+                tickLine={false}
+                interval={0}
+              />
+              <YAxis
+                unit="%"
+                stroke="#564240"
+                tick={{ fontSize: 10, fontFamily: "JetBrains Mono, monospace", fill: "#564240" }}
+                tickLine={false}
+              />
+              <Tooltip
+                cursor={{ fill: "rgba(0,0,0,0.04)" }}
+                contentStyle={{
+                  background: "#fdfbf7",
+                  border: "1px solid #ddc0bd",
+                  borderRadius: 8,
+                  fontFamily: "JetBrains Mono, monospace",
+                  fontSize: 11,
+                }}
+                formatter={(v: number) => [`${Number(v).toFixed(2)}%`, "99% upper bound"]}
+              />
+              <ReferenceLine y={limit * 100} stroke="#7A221E" strokeDasharray="4 3" />
+              <Bar dataKey="pct" radius={[4, 4, 0, 0]}>
+                {chartData.map((d, i) => (
+                  <Cell
+                    key={i}
+                    fill={d.pct > limit * 100 ? "#7A221E" : d.isPrimary ? "#5C6300" : "#c8c6c5"}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {a.explanation && (
+        <p className="font-mono text-[11px] text-on-surface-variant leading-relaxed px-1">
+          {a.explanation}
+        </p>
+      )}
+    </div>
+  );
+}
+
+type Tone = "good" | "bad" | "plain";
+
+function Panel({
+  title,
+  badge,
+  children,
+}: {
+  title: string;
+  badge: { text: string; tone: "good" | "bad" | "neutral" };
+  children: React.ReactNode;
+}) {
+  const badgeClass =
+    badge.tone === "good"
+      ? "bg-moss-accent/10 border-moss-accent/40 text-moss-accent"
+      : badge.tone === "bad"
+        ? "bg-lacquer-red/10 border-lacquer-red/40 text-lacquer-red"
+        : "bg-surface-container border-outline-variant text-on-surface-variant";
+
+  return (
+    <section className="bg-surface-container-lowest rounded-xl border border-outline-variant p-gutter shadow-sm">
+      <header className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-1 border-b border-outline-variant/60">
+        <h3 className="font-label-caps text-xs text-ink-charcoal uppercase font-bold tracking-[0.12em]">
+          {title}
+        </h3>
+        <span
+          className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${badgeClass}`}
+        >
+          {badge.text}
+        </span>
+      </header>
+      <dl className="flex flex-col">{children}</dl>
+    </section>
+  );
+}
+
+function Row({
+  label,
+  value,
+  tone = "plain",
+  hint,
+}: {
+  label: string;
+  value: string | null;
+  tone?: Tone;
+  hint?: string | undefined;
+}) {
+  const colour =
+    value == null
+      ? "text-outline-variant"
+      : tone === "good"
+        ? "text-moss-accent"
+        : tone === "bad"
+          ? "text-lacquer-red"
+          : "text-ink-charcoal";
+
+  return (
+    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 py-2.5 border-b border-outline-variant/30 last:border-b-0 font-mono text-xs">
+      <dt className="text-on-surface-variant">{label}</dt>
+      <dd className={`font-bold text-right ${colour}`}>
+        {value ?? "—"}
+        {hint && (
+          <span className="block font-normal text-[10px] text-on-surface-variant mt-0.5">
+            {hint}
+          </span>
+        )}
+      </dd>
     </div>
   );
 }

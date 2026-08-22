@@ -11,12 +11,18 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ActionRouteImport } from './routes/action'
+import { Route as ArmstrongRouteImport } from './routes/armstrong'
 import { Route as AuditRouteImport } from './routes/audit'
 import { Route as CognitionRouteImport } from './routes/cognition'
+import { Route as MissionRouteImport } from './routes/mission'
 import { Route as OrchestratorRouteImport } from './routes/orchestrator'
 import { Route as OverviewRouteImport } from './routes/overview'
 import { Route as PerceptionRouteImport } from './routes/perception'
 import { Route as SimulationRouteImport } from './routes/simulation'
+import { Route as ArmstrongIndexRouteImport } from './routes/armstrong.index'
+import { Route as ArmstrongParametersRouteImport } from './routes/armstrong.parameters'
+import { Route as ArmstrongPathwayRouteImport } from './routes/armstrong.pathway'
+import { Route as ArmstrongReviewRouteImport } from './routes/armstrong.review'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,6 +34,11 @@ const ActionRoute = ActionRouteImport.update({
   path: '/action',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ArmstrongRoute = ArmstrongRouteImport.update({
+  id: '/armstrong',
+  path: '/armstrong',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuditRoute = AuditRouteImport.update({
   id: '/audit',
   path: '/audit',
@@ -36,6 +47,11 @@ const AuditRoute = AuditRouteImport.update({
 const CognitionRoute = CognitionRouteImport.update({
   id: '/cognition',
   path: '/cognition',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MissionRoute = MissionRouteImport.update({
+  id: '/mission',
+  path: '/mission',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrchestratorRoute = OrchestratorRouteImport.update({
@@ -58,76 +74,132 @@ const SimulationRoute = SimulationRouteImport.update({
   path: '/simulation',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ArmstrongIndexRoute = ArmstrongIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ArmstrongRoute,
+} as any)
+const ArmstrongParametersRoute = ArmstrongParametersRouteImport.update({
+  id: '/parameters',
+  path: '/parameters',
+  getParentRoute: () => ArmstrongRoute,
+} as any)
+const ArmstrongPathwayRoute = ArmstrongPathwayRouteImport.update({
+  id: '/pathway',
+  path: '/pathway',
+  getParentRoute: () => ArmstrongRoute,
+} as any)
+const ArmstrongReviewRoute = ArmstrongReviewRouteImport.update({
+  id: '/review',
+  path: '/review',
+  getParentRoute: () => ArmstrongRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/action': typeof ActionRoute
+  '/armstrong': typeof ArmstrongRouteWithChildren
   '/audit': typeof AuditRoute
   '/cognition': typeof CognitionRoute
+  '/mission': typeof MissionRoute
   '/orchestrator': typeof OrchestratorRoute
   '/overview': typeof OverviewRoute
   '/perception': typeof PerceptionRoute
   '/simulation': typeof SimulationRoute
+  '/armstrong/parameters': typeof ArmstrongParametersRoute
+  '/armstrong/pathway': typeof ArmstrongPathwayRoute
+  '/armstrong/review': typeof ArmstrongReviewRoute
+  '/armstrong/': typeof ArmstrongIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/action': typeof ActionRoute
   '/audit': typeof AuditRoute
   '/cognition': typeof CognitionRoute
+  '/mission': typeof MissionRoute
   '/orchestrator': typeof OrchestratorRoute
   '/overview': typeof OverviewRoute
   '/perception': typeof PerceptionRoute
   '/simulation': typeof SimulationRoute
+  '/armstrong/parameters': typeof ArmstrongParametersRoute
+  '/armstrong/pathway': typeof ArmstrongPathwayRoute
+  '/armstrong/review': typeof ArmstrongReviewRoute
+  '/armstrong': typeof ArmstrongIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/action': typeof ActionRoute
+  '/armstrong': typeof ArmstrongRouteWithChildren
   '/audit': typeof AuditRoute
   '/cognition': typeof CognitionRoute
+  '/mission': typeof MissionRoute
   '/orchestrator': typeof OrchestratorRoute
   '/overview': typeof OverviewRoute
   '/perception': typeof PerceptionRoute
   '/simulation': typeof SimulationRoute
+  '/armstrong/parameters': typeof ArmstrongParametersRoute
+  '/armstrong/pathway': typeof ArmstrongPathwayRoute
+  '/armstrong/review': typeof ArmstrongReviewRoute
+  '/armstrong/': typeof ArmstrongIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/action'
+    | '/armstrong'
     | '/audit'
     | '/cognition'
+    | '/mission'
     | '/orchestrator'
     | '/overview'
     | '/perception'
     | '/simulation'
+    | '/armstrong/parameters'
+    | '/armstrong/pathway'
+    | '/armstrong/review'
+    | '/armstrong/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/action'
     | '/audit'
     | '/cognition'
+    | '/mission'
     | '/orchestrator'
     | '/overview'
     | '/perception'
     | '/simulation'
+    | '/armstrong/parameters'
+    | '/armstrong/pathway'
+    | '/armstrong/review'
+    | '/armstrong'
   id:
     | '__root__'
     | '/'
     | '/action'
+    | '/armstrong'
     | '/audit'
     | '/cognition'
+    | '/mission'
     | '/orchestrator'
     | '/overview'
     | '/perception'
     | '/simulation'
+    | '/armstrong/parameters'
+    | '/armstrong/pathway'
+    | '/armstrong/review'
+    | '/armstrong/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ActionRoute: typeof ActionRoute
+  ArmstrongRoute: typeof ArmstrongRouteWithChildren
   AuditRoute: typeof AuditRoute
   CognitionRoute: typeof CognitionRoute
+  MissionRoute: typeof MissionRoute
   OrchestratorRoute: typeof OrchestratorRoute
   OverviewRoute: typeof OverviewRoute
   PerceptionRoute: typeof PerceptionRoute
@@ -150,6 +222,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ActionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/armstrong': {
+      id: '/armstrong'
+      path: '/armstrong'
+      fullPath: '/armstrong'
+      preLoaderRoute: typeof ArmstrongRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/audit': {
       id: '/audit'
       path: '/audit'
@@ -162,6 +241,13 @@ declare module '@tanstack/react-router' {
       path: '/cognition'
       fullPath: '/cognition'
       preLoaderRoute: typeof CognitionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mission': {
+      id: '/mission'
+      path: '/mission'
+      fullPath: '/mission'
+      preLoaderRoute: typeof MissionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/orchestrator': {
@@ -192,14 +278,62 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SimulationRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/armstrong/': {
+      id: '/armstrong/'
+      path: '/'
+      fullPath: '/armstrong/'
+      preLoaderRoute: typeof ArmstrongIndexRouteImport
+      parentRoute: typeof ArmstrongRoute
+    }
+    '/armstrong/parameters': {
+      id: '/armstrong/parameters'
+      path: '/parameters'
+      fullPath: '/armstrong/parameters'
+      preLoaderRoute: typeof ArmstrongParametersRouteImport
+      parentRoute: typeof ArmstrongRoute
+    }
+    '/armstrong/pathway': {
+      id: '/armstrong/pathway'
+      path: '/pathway'
+      fullPath: '/armstrong/pathway'
+      preLoaderRoute: typeof ArmstrongPathwayRouteImport
+      parentRoute: typeof ArmstrongRoute
+    }
+    '/armstrong/review': {
+      id: '/armstrong/review'
+      path: '/review'
+      fullPath: '/armstrong/review'
+      preLoaderRoute: typeof ArmstrongReviewRouteImport
+      parentRoute: typeof ArmstrongRoute
+    }
   }
 }
+
+interface ArmstrongRouteChildren {
+  ArmstrongParametersRoute: typeof ArmstrongParametersRoute
+  ArmstrongPathwayRoute: typeof ArmstrongPathwayRoute
+  ArmstrongReviewRoute: typeof ArmstrongReviewRoute
+  ArmstrongIndexRoute: typeof ArmstrongIndexRoute
+}
+
+const ArmstrongRouteChildren: ArmstrongRouteChildren = {
+  ArmstrongParametersRoute: ArmstrongParametersRoute,
+  ArmstrongPathwayRoute: ArmstrongPathwayRoute,
+  ArmstrongReviewRoute: ArmstrongReviewRoute,
+  ArmstrongIndexRoute: ArmstrongIndexRoute,
+}
+
+const ArmstrongRouteWithChildren = ArmstrongRoute._addFileChildren(
+  ArmstrongRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActionRoute: ActionRoute,
+  ArmstrongRoute: ArmstrongRouteWithChildren,
   AuditRoute: AuditRoute,
   CognitionRoute: CognitionRoute,
+  MissionRoute: MissionRoute,
   OrchestratorRoute: OrchestratorRoute,
   OverviewRoute: OverviewRoute,
   PerceptionRoute: PerceptionRoute,
