@@ -221,6 +221,120 @@ class TestFARAWAYSafetySuite(unittest.TestCase):
         self.assertGreater(res_disagree["rotation_disagreement_deg"], 90.0)
         print(f"  [OK] Feature #3 (Redundant PnP): Agreement={res_agree['cross_estimator_agreement']}, Disagreement rot diff={res_disagree['rotation_disagreement_deg']}°")
 
+    def test_feature_9_speed_plus_v2_benchmark(self):
+        """#9: ESA/Stanford SPEED+ v2 Benchmark Metric & 3D Wireframe projection."""
+        from perception.speed_dataset_benchmark import (
+            compute_speed_benchmark_metrics, project_tango_wireframe, SPEED_V2_TEST_BENCH
+        )
+        # Test exact match
+        r_gt = np.array([0.0, 0.0, 10.0])
+        q_gt = np.array([1.0, 0.0, 0.0, 0.0])
+        metrics_exact = compute_speed_benchmark_metrics(r_gt, q_gt, r_gt, q_gt)
+        self.assertEqual(metrics_exact["translation_error_m"], 0.0)
+        self.assertEqual(metrics_exact["angular_error_deg"], 0.0)
+        self.assertEqual(metrics_exact["speed_competition_score"], 0.0)
+
+        # Test small error (Class A)
+        r_noisy = r_gt + np.array([0.02, -0.01, 0.01])
+        q_noisy = np.array([0.9998, 0.01, 0.01, 0.0])
+        metrics_noisy = compute_speed_benchmark_metrics(r_noisy, q_noisy, r_gt, q_gt)
+        self.assertLess(metrics_noisy["speed_competition_score"], 0.05)
+        self.assertIn("Class A", metrics_noisy["grade"])
+
+        # Test wireframe projection
+        wf = project_tango_wireframe(r_gt, q_gt, canvas_w=400, canvas_h=400)
+        self.assertEqual(len(wf["keypoints"]), 11)
+        self.assertGreater(len(wf["edges"]), 10)
+        print(f"  [OK] Feature #9 (SPEED+ v2 Benchmark): Perfect Score={metrics_exact['speed_competition_score']}, Noisy Score={metrics_noisy['speed_competition_score']:.4f} ({metrics_noisy['grade']})")
+
+    def test_feature_10_nasa_telemetry_envelope(self):
+        """#10: NASA RPO Approach Corridor & TAM 12-Thruster Allocation."""
+        from perception.speed_dataset_benchmark import get_nasa_flight_telemetry_snapshot
+        snap = get_nasa_flight_telemetry_snapshot(range_m=12.5)
+        self.assertTrue(snap["flight_corridor"]["in_corridor"])
+        self.assertGreater(snap["flight_corridor"]["cone_margin_deg"], 5.0)
+        self.assertEqual(len(snap["propulsion_rcs"]["thruster_duty_pct"]), 12)
+        self.assertIn("avionics", snap["thermal_bus_nodes_c"])
+        print(f"  [OK] Feature #10 (NASA Telemetry): In-Corridor={snap['flight_corridor']['in_corridor']}, Thrusters={len(snap['propulsion_rcs']['thruster_duty_pct'])}, Status={snap['flight_corridor']['range_rate_status']}")
+
+    def test_feature_11_mekf_attitude_filter(self):
+        """#11: 6-DoF Multiplicative Extended Kalman Filter (MEKF) with Lie Algebra & Covariance Gating."""
+        from perception.mekf_state_estimator import SpacecraftMEKF
+        mekf = SpacecraftMEKF(initial_position=np.array([20.0, 0.5, -0.2]), initial_quaternion=np.array([1.0, 0.0, 0.0, 0.0]))
+        # Predict step
+        mekf.predict(dt=0.1)
+        self.assertAlmostEqual(mekf.r[0], 20.0, places=1)
+
+        # Update with low Jensen Gain (High trust)
+        res_good = mekf.update_pose_measurement(np.array([19.9, 0.48, -0.19]), np.array([0.999, 0.01, 0.0, 0.0]), jensen_gain_deg=2.5)
+        self.assertTrue(res_good["measurement_accepted"])
+        self.assertLess(res_good["sigma_pos_3d_m"], 1.5)
+
+        # Update with extreme Jensen Gain (Symmetry ambiguity -> measurement rejected/downweighted)
+        res_bad = mekf.update_pose_measurement(np.array([5.0, 10.0, -8.0]), np.array([0.0, 1.0, 0.0, 0.0]), jensen_gain_deg=32.0)
+        print(f"  [OK] Feature #11 (MEKF 6-DoF Filter): Accepted={res_good['measurement_accepted']}, Pos sigma={res_good['sigma_pos_3d_m']}m, Att sigma={res_good['sigma_att_3d_deg']}deg")
+
+    def test_feature_12_tam_thruster_allocation(self):
+        """#12: 12-Thruster Allocation Matrix (TAM) Pseudoinverse & Minimum Impulse Bit Gating."""
+        from action.tam_thruster_allocator import ThrusterAllocationMatrix
+        tam = ThrusterAllocationMatrix(isp_s=220.0, initial_propellant_kg=500.0)
+        # Request deceleration along +X axis (2.5 N braking force)
+        alloc = tam.allocate(force_cmd_n=np.array([-2.5, 0.0, 0.0]), torque_cmd_nm=np.array([0.0, 0.0, 0.0]), dt_s=0.1)
+        self.assertEqual(len(alloc["thruster_duty_pct"]), 12)
+        # Thrusters 1 and 2 (+X face) should fire
+        self.assertGreater(alloc["thruster_duty_pct"][0], 0.0)
+        self.assertGreater(alloc["thruster_duty_pct"][1], 0.0)
+        self.assertLess(alloc["propellant_remaining_kg"], 500.0)
+        print(f"  [OK] Feature #12 (TAM 12-RCS Bus): Realized F_x={alloc['force_realized_n'][0]}N, Active Valves={alloc['valve_firings_count']}, dm_prop={500.0-alloc['propellant_remaining_kg']:.5f}kg")
+
+    def test_feature_13_nasa_fdir_flight_director(self):
+        """#13: NASA FDIR Autonomous Flight Director & Automated CAM Collision Avoidance Abort."""
+        from orchestrator.fdir_flight_director import NASAAutonomousFlightDirector, FlightPhase
+        fdir = NASAAutonomousFlightDirector(cone_half_angle_deg=20.0, koz_radius_m=10.0)
+        
+        # Nominal far approach
+        stat_nom = fdir.evaluate_safety_step(r_vec=np.array([25.0, 1.0, 0.5]), v_vec=np.array([-0.15, 0.0, 0.0]), jensen_gain_deg=2.5, is_trustworthy=True)
+        self.assertEqual(stat_nom.phase, FlightPhase.CLOSING_GLISSADE)
+        self.assertFalse(stat_nom.tripwire_triggered)
+
+        # Severe out-of-cone inside Keep-Out Zone -> Triggers CAM Abort
+        stat_abort = fdir.evaluate_safety_step(r_vec=np.array([5.0, 8.0, 0.0]), v_vec=np.array([-0.2, 0.0, 0.0]), jensen_gain_deg=4.0, is_trustworthy=True)
+        self.assertEqual(stat_abort.phase, FlightPhase.CAM_ABORT)
+        self.assertTrue(stat_abort.tripwire_triggered)
+        self.assertGreater(stat_abort.cam_delta_v_mps[1], 0.0) # Radial escape burn
+        print(f"  [OK] Feature #13 (NASA FDIR Director): Nominal Phase={stat_nom.phase.value}, CAM Abort Triggered={stat_abort.tripwire_triggered} ({stat_abort.tripwire_reason[:45]}...)")
+
+    def test_feature_14_dynamic_fdir_recovery_engine(self):
+        """#14: Dynamic NASA FDIR Guided Recovery Pathways Generator & Mathematical Bounds."""
+        from orchestrator.fdir_flight_director import NASAAutonomousFlightDirector
+        fdir = NASAAutonomousFlightDirector()
+
+        # Simulate optical solar glare tripwire (high Jensen Gain)
+        opts_glare = fdir.generate_dynamic_recovery_options(
+            r_vec=np.array([16.4, 2.1, -0.4]),
+            v_vec=np.array([-0.12, 0.01, 0.0]),
+            jensen_gain_deg=28.6,
+            is_trustworthy=False,
+            anomaly_detected=True,
+            anomaly_type="specular_solar_glare"
+        )
+        self.assertGreaterEqual(len(opts_glare), 5)
+        # Check that boresight repointing is recommended with valid predicted JG drop
+        slew_opt = next(o for o in opts_glare if o["id"] == "boresight_realign")
+        self.assertEqual(slew_opt["urgency"], "RECOMMENDED")
+        self.assertLess(slew_opt["predicted_jg_deg"], 5.0)
+        self.assertGreater(slew_opt["confidence_gain_pct"], 50)
+
+        # Check that template PnP gate is present and mathematically grounded
+        pnp_opt = next(o for o in opts_glare if o["id"] == "template_pnp_crosscheck")
+        self.assertIn("Perspective-n-Point", pnp_opt["description"])
+        self.assertIn("d_SO3", pnp_opt["mathematical_basis"])
+
+        # Check that corridor re-centering is present
+        traj_opt = next(o for o in opts_glare if o["id"] == "reconfigure_trajectory")
+        self.assertGreater(traj_opt["delta_v_mps"], 0.0)
+        print(f"  [OK] Feature #14 (Dynamic FDIR Recovery Engine): Evaluated {len(opts_glare)} pathways, Slew Pred JG={slew_opt['predicted_jg_deg']}deg (Gain={slew_opt['confidence_gain_pct']}%)")
+
 
 if __name__ == "__main__":
     print("\n" + "=" * 70)

@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """
-Phase 4: Crew Interface Agent — Production Pipeline
-FastAPI + WebSocket backend with Progressive Disclosure,
-Dual-Route Conversation, Armstrong Protocol, and Voice Grammar.
+interface/server.py
+-------------------
+[ARCHITECTURE NOTE]
+Canonical unified mission operations server is interface/app.py.
+This module contains the Phase 4 Crew Interface reference implementation with
+Progressive Disclosure and Voice Grammar schemas.
 """
 
 import asyncio
