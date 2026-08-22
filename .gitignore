@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+.venv/
+env/
+venv/
+*.egg-info/
+dist/
+build/
+*.log
+
+# Node & Frontend
+node_modules/
+frontend/node_modules/
+.vercel/
+frontend/.vercel/
+.output/
+frontend/.output/
+.nitro/
+frontend/.nitro/
+dist/
+frontend/dist/
+
+# Large ML weights & checkpoints (>100MB)
+checkpoints/
+*.pt
+*.pth
+perception/checkpoints/temp_extract/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

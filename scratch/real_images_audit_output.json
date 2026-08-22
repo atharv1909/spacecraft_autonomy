@@ -1,0 +1,134 @@
+[
+  {
+    "image": "test1.jpeg",
+    "path": "C:\\Users\\athar\\OneDrive\\Desktop\\test1.jpeg",
+    "resolution": "1600x1000",
+    "gatekeeper": {
+      "is_valid": true,
+      "confidence": 0.9998,
+      "logit": 8.2991,
+      "rejection_reason": null,
+      "latency_ms": 505.38,
+      "fpr95": 0.0265,
+      "accuracy": 0.9782,
+      "backbone": "DINOv2 ViT-Small/14 (Meta AI)",
+      "layer": "Layer 1: Foundation Vision Gatekeeper"
+    },
+    "pose": {
+      "boresight_range_m": 1.4111746549606323,
+      "transverse_offset_mm": 27.042767571820765,
+      "los_angle_deg": 1.0978420119078278,
+      "cone_margin_deg": 18.90215798809217,
+      "in_cone": true
+    },
+    "uncertainty": {
+      "quotient_jensen_gain_deg": 73.73,
+      "confidence_level": "moderate",
+      "confidence_label": "SYMMETRY AMBIGUITY (spread=73.7\u00b0): When Jensen Gain is in this range (65.0\u00b0-90.0\u00b0), true rotation error is under 85.0 degrees, 95% of the time (verified on 150 held-out calibration samples).",
+      "bound_deg": 85.0,
+      "ood_distance": 18.1799,
+      "is_in_distribution": true,
+      "pnp_agree": null,
+      "rot_diff_deg": 0.0
+    },
+    "consensus": {
+      "perception_vote": "HOLD_FOR_CONSISTENCY",
+      "action_vote": "INHIBIT_CLOSING",
+      "final_decision": "STATION_KEEPING_HOLD",
+      "fdir_action": "FDIR LEVEL 1: Station-keep at current range, fuse 12-state MEKF gyro propagation, verify star tracker."
+    },
+    "timings_ms": {
+      "gatekeeper": 506.3450336456299,
+      "pose_jensen": 15208.247900009155,
+      "total": 15714.592933654785
+    }
+  },
+  {
+    "image": "test2.jpeg",
+    "path": "C:\\Users\\athar\\OneDrive\\Desktop\\test2.jpeg",
+    "resolution": "1600x1000",
+    "gatekeeper": {
+      "is_valid": true,
+      "confidence": 0.9999,
+      "logit": 9.499,
+      "rejection_reason": null,
+      "latency_ms": 99.32,
+      "fpr95": 0.0265,
+      "accuracy": 0.9782,
+      "backbone": "DINOv2 ViT-Small/14 (Meta AI)",
+      "layer": "Layer 1: Foundation Vision Gatekeeper"
+    },
+    "pose": {
+      "boresight_range_m": 2.8599436283111572,
+      "transverse_offset_mm": 40.595232064343165,
+      "los_angle_deg": 0.8132255651941779,
+      "cone_margin_deg": 19.186774434805823,
+      "in_cone": true
+    },
+    "uncertainty": {
+      "quotient_jensen_gain_deg": 68.0,
+      "confidence_level": "moderate",
+      "confidence_label": "SYMMETRY AMBIGUITY (spread=68.0\u00b0): When Jensen Gain is in this range (65.0\u00b0-90.0\u00b0), true rotation error is under 85.0 degrees, 95% of the time (verified on 150 held-out calibration samples).",
+      "bound_deg": 85.0,
+      "ood_distance": 28.27,
+      "is_in_distribution": true,
+      "pnp_agree": null,
+      "rot_diff_deg": 0.0
+    },
+    "consensus": {
+      "perception_vote": "HOLD_FOR_CONSISTENCY",
+      "action_vote": "INHIBIT_CLOSING",
+      "final_decision": "STATION_KEEPING_HOLD",
+      "fdir_action": "FDIR LEVEL 1: Station-keep at current range, fuse 12-state MEKF gyro propagation, verify star tracker."
+    },
+    "timings_ms": {
+      "gatekeeper": 99.98583793640137,
+      "pose_jensen": 13779.616355895996,
+      "total": 13879.602193832397
+    }
+  },
+  {
+    "image": "test3.jpeg",
+    "path": "C:\\Users\\athar\\OneDrive\\Desktop\\test3.jpeg",
+    "resolution": "1600x1000",
+    "gatekeeper": {
+      "is_valid": false,
+      "confidence": 0.4852,
+      "logit": -0.0591,
+      "rejection_reason": "Low Spacecraft Confidence / Sensor Glare Tripwire",
+      "latency_ms": 140.35,
+      "fpr95": 0.0265,
+      "accuracy": 0.9782,
+      "backbone": "DINOv2 ViT-Small/14 (Meta AI)",
+      "layer": "Layer 1: Foundation Vision Gatekeeper"
+    },
+    "pose": {
+      "boresight_range_m": 1.745577096939087,
+      "transverse_offset_mm": 29.695846081858132,
+      "los_angle_deg": 0.9746246914878848,
+      "cone_margin_deg": 19.025375308512114,
+      "in_cone": true
+    },
+    "uncertainty": {
+      "quotient_jensen_gain_deg": 84.68,
+      "confidence_level": "moderate",
+      "confidence_label": "SYMMETRY AMBIGUITY (spread=84.7\u00b0): When Jensen Gain is in this range (65.0\u00b0-90.0\u00b0), true rotation error is under 85.0 degrees, 95% of the time (verified on 150 held-out calibration samples).",
+      "bound_deg": 85.0,
+      "ood_distance": 26.5194,
+      "is_in_distribution": true,
+      "pnp_agree": null,
+      "rot_diff_deg": 0.0
+    },
+    "consensus": {
+      "perception_vote": "ABORT_RECOVER",
+      "action_vote": "SAFE_ATTITUDE_HOLD",
+      "final_decision": "FDIR_RECOVERY_ENGAGED",
+      "fdir_action": "FDIR LEVEL 2: Tripwire triggered. Execute -15.0\u00b0 camera roll maneuver off specular vector, engage EPnP solver."
+    },
+    "timings_ms": {
+      "gatekeeper": 140.79976081848145,
+      "pose_jensen": 10822.798013687134,
+      "total": 10963.597774505615
+    }
+  }
+]
