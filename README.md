@@ -17,22 +17,101 @@
     <img src="https://img.shields.io/badge/PyTorch-ResNet50_&_DINOv2-1a0a2e?style=for-the-badge&logo=pytorch&logoColor=FF69B4" />
     <img src="https://img.shields.io/badge/FastAPI-WebSocket-1a0a2e?style=for-the-badge&logo=fastapi&logoColor=00F0FF" />
     <img src="https://img.shields.io/badge/React_Three_Fiber-3D_Orbital-1a0a2e?style=for-the-badge&logo=threedotjs&logoColor=FFB7C5" />
-    <img src="https://img.shields.io/badge/Vercel-Live_Production-1a0a2e?style=for-the-badge&logo=vercel&logoColor=00F0FF" />
+    <img src="https://img.shields.io/badge/Docker-Cloud_Run-1a0a2e?style=for-the-badge&logo=docker&logoColor=00F0FF" />
+    <img src="https://img.shields.io/badge/Vercel-Live_Production-1a0a2e?style=for-the-badge&logo=vercel&logoColor=FF69B4" />
   </div>
   <br>
 
-  <a href="https://frontend-ijdlvrowi-atharv-deshmukhs-projects-91fec5f2.vercel.app">
-    <img src="https://img.shields.io/badge/🚀_Live_Mission_Control-Try_Now-FF69B4?style=for-the-badge&labelColor=1a0a2e" alt="Live Demo" />
+  <a href="https://spacecraft-autonomy-222404104450.us-central1.run.app">
+    <img src="https://img.shields.io/badge/🚀_Live_Demo-Try_Now-FF69B4?style=for-the-badge&labelColor=1a0a2e" alt="Live Demo" />
+  </a>
+  &nbsp;
+  <a href="https://www.youtube.com/watch?v=SMy10IucqB8">
+    <img src="https://img.shields.io/badge/▶️_YouTube-Demo_Video-00F0FF?style=for-the-badge&logo=youtube&logoColor=white&labelColor=1a0a2e" alt="YouTube" />
+  </a>
+  &nbsp;
+  <a href="https://drive.google.com/file/d/1rGZc2U9Tka9Y5hptENpVN2ygPPBFtmC1/view?usp=sharing">
+    <img src="https://img.shields.io/badge/📊_Slides-View_Deck-FFB7C5?style=for-the-badge&labelColor=1a0a2e" alt="PPT" />
   </a>
   &nbsp;
   <a href="https://github.com/atharv1909/spacecraft_autonomy">
     <img src="https://img.shields.io/badge/💻_Official_GitHub-atharv1909-00F0FF?style=for-the-badge&logo=github&logoColor=white&labelColor=1a0a2e" alt="GitHub" />
   </a>
-  &nbsp;
-  <a href="./docs/isro_symbiosis_proposal.md">
-    <img src="https://img.shields.io/badge/📄_ISRO_Proposal-Read_Doc-FFB7C5?style=for-the-badge&labelColor=1a0a2e" alt="ISRO Proposal" />
-  </a>
 </div>
+
+---
+
+## 🌌 The Problem & Our Solution
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                       THE CORE PROBLEM STATEMENT                                       │
+│                                                                                                        │
+│  In deep-space proximity operations (20+ light-minutes from Earth), real-time ground human control is │
+│  physically impossible. When monocular vision models encounter symmetric spacecraft (e.g. Tango 180°  │
+│  solar arrays), harsh solar glare, or thermal anomalies, standard AI outputs CONFIDENTLY WRONG poses. │
+│                                                                                                        │
+│      Confidently Wrong Pose + Blind Thruster Firing ⟹ Catastrophic Kinetic Collision ($500M Loss)     │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+In deep-space proximity operations, AI systems must **perceive** (estimate target pose), **reason** (detect anomalies), and **act** (choose maneuvers) — all without human input for up to 20+ minutes (Mars communication delay). Current systems operate as disconnected black boxes: the neural network says "dock here" but can't explain **how confident it is** or **why it chose that action**.
+
+This creates a fatal gap: **a confidently wrong pose estimate + an opaque decision pipeline = a collision nobody saw coming.**
+
+### Our Solution
+**SYMBIOSIS** bridges *"what the AI sees"* and *"why the AI acts"* through a 5-agent architecture where every decision carries calibrated uncertainty and human-readable explanations:
+- **If the neural network is guessing, the spacecraft refuses to dock.**
+- **If the situation is novel, the system escalates to humans.**
+- **If a human overrides, the system learns from that decision.**
+
+---
+
+## 🚨 6 Real-World Failure Scenarios Where SYMBIOSIS Halts & Recovers
+
+Here are the 6 failure cases where SYMBIOSIS refuses to dock, halts forward motion, and initiates safety recovery:
+
+---
+
+### 1. Solar Glare and Orientation Confusion
+* **What triggers it**: Direct 1000W sunlight bounces off the target satellite's solar arrays into the camera, washing out the image and causing front-versus-back confusion.
+* **Why the system halts**: If the spacecraft trusts a confused orientation, it will thrust in the wrong direction and hit the target's solar wings.
+* **What it does instead**: It halts forward approach, tilts the camera +5 degrees away from the reflection, and uses corner-point geometry to verify true orientation.
+
+---
+
+### 2. Drifting Outside the 20-Degree Approach Corridor
+* **What triggers it**: Natural orbital gravity pulls the spacecraft sideways, pushing it past the safe 20-degree cone inside the 10-meter Keep-Out Zone.
+* **Why the system halts**: Approaching from an off-axis angle risks clipping protruding solar panels or antennas instead of aligning with the docking ring.
+* **What it does instead**: It pauses forward motion and fires lateral thruster pulses to push the vehicle back to the centerline before resuming.
+
+---
+
+### 3. Kinetic Overspeed (Approaching Too Fast)
+* **What triggers it**: Closing speed exceeds the safe braking curve based on distance.
+* **Why the system halts**: Cold-gas thrusters require a minimum distance to stop. Moving too fast means a physical collision becomes unavoidable.
+* **What it does instead**: It immediately taps reverse braking thrusters to bleed speed and locks a strict speed limit before allowing any further approach.
+
+---
+
+### 4. Floating Space Debris and Unfamiliar Objects
+* **What triggers it**: Space junk, torn thermal insulation foil, or unfamiliar lighting enters the camera frame (Mahalanobis distance over 15, situation novelty over 70%).
+* **Why the system halts**: Standard neural networks hallucinate fake docking ports when shown unfamiliar objects.
+* **What it does instead**: It hovers in a stationary standoff, takes multiple photo scans to filter out floating particles, and cross-references its memory database.
+
+---
+
+### 5. Thruster Overheating and Electrical Drops
+* **What triggers it**: Rapid fine-tuning pulses cause specific cold-gas thruster solenoid valves to exceed thermal limits (over 85 degrees Celsius).
+* **Why the system halts**: If hot nozzles keep firing, the valves will seize open, sending the spacecraft into an uncontrollable spin.
+* **What it does instead**: It halts forward thrust and runs a solver to re-route steering commands across the cooler thrusters.
+
+---
+
+### 6. Compound Failure (Blinded and Drifting Simultaneously)
+* **What triggers it**: Solar glare blinds the camera at the exact same moment orbital drift pushes the vehicle off-course.
+* **Why the system halts**: Autonomous software cannot safely guess when both sensors and physical margins fail at the same time.
+* **What it does instead**: It locks all thrusters into a station-keeping hover, activates the Armstrong Protocol, and gives the human flight commander a 45-second window to choose a certified override action.
 
 ---
 
@@ -316,20 +395,6 @@ spacecraft_autonomy/
 ├── integration.py       # Full 5-agent pipeline runner
 └── test_faraway_safety_suite.py  # Validation tests for all 8 safety features
 ```
-
----
-
-## 🌐 Resources & Publications
-
-| Resource | Link |
-|---|---|
-| **Live Mission Control (Vercel)** | [https://frontend-ijdlvrowi-atharv-deshmukhs-projects-91fec5f2.vercel.app](https://frontend-ijdlvrowi-atharv-deshmukhs-projects-91fec5f2.vercel.app) |
-| **YouTube Demo** | [Demo Walkthrough](https://www.youtube.com/watch?v=SMy10IucqB8) |
-| **Slides Deck** | [Presentation Deck](https://drive.google.com/file/d/1rGZc2U9Tka9Y5hptENpVN2ygPPBFtmC1/view?usp=sharing) |
-| **ISRO Technical Proposal** | [`./docs/isro_symbiosis_proposal.md`](./docs/isro_symbiosis_proposal.md) |
-| **Academic LaTeX Paper** | [`./docs/symbiosis_paper.tex`](./docs/symbiosis_paper.tex) |
-| **API Documentation** | `/api/docs` (Swagger UI) |
-| **Health Check** | `/api/health` |
 
 ---
 
