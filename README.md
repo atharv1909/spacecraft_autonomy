@@ -15,7 +15,7 @@
     <img src="https://img.shields.io/badge/🚀_Live_Demo-Try_Now-FF69B4?style=for-the-badge&labelColor=1a0a2e" alt="Live Demo" />
   </a>
   &nbsp;
-  <a href="https://www.youtube.com/watch?v=SMy10IucqB8">
+  <a href="https://www.youtube.com/watch?v=DZ3CZ-wg5CI">
     <img src="https://img.shields.io/badge/▶️_YouTube-Demo_Video-00F0FF?style=for-the-badge&logo=youtube&logoColor=white&labelColor=1a0a2e" alt="YouTube" />
   </a>
   &nbsp;
