@@ -346,22 +346,6 @@ spacecraft_autonomy/
 └── test_faraway_safety_suite.py  # Validation tests for all 8 safety features
 ```
 
----
-
-## 🌐 Resources
-
-| Resource | Link |
-|---|---|
-| **Live Demo** | [Mission Control Dashboard](https://spacecraft-autonomy-222404104450.us-central1.run.app) |
-| **YouTube** | [Demo Walkthrough](https://www.youtube.com/watch?v=SMy10IucqB8) |
-| **Slides** | [Presentation Deck](https://drive.google.com/file/d/1rGZc2U9Tka9Y5hptENpVN2ygPPBFtmC1/view?usp=sharing) |
-| **API Docs** | `/api/docs` (Swagger UI) |
-| **Health Check** | `/api/health` |
-| **ISRO Technical Proposal** | [`docs/isro_symbiosis_proposal.md`](./docs/isro_symbiosis_proposal.md) |
-| **Academic Research Paper** | [`docs/symbiosis_paper.tex`](./docs/symbiosis_paper.tex) |
-
----
-
 <div align="center">
   <p><b>Built by Team SLAYERS</b></p>
   <p><i>"If the AI can't explain why, the spacecraft doesn't fly."</i></p>
