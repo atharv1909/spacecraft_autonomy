@@ -14,7 +14,7 @@
   <div>
     <img src="https://img.shields.io/badge/Task-Workflow:_Recoverable_Error_Path-FF69B4?style=for-the-badge&labelColor=1a0a2e" />
     <img src="https://img.shields.io/badge/Python-3.10+-1a0a2e?style=for-the-badge&logo=python&logoColor=FFB7C5" />
-    <img src="https://img.shields.io/badge/PyTorch-ResNet50_&_DINOv2-1a0a2e?style=for-the-badge&logo=pytorch&logoColor=FF69B4" />
+    <img src="https://img.shields.io/badge/PyTorch-ResNet50-1a0a2e?style=for-the-badge&logo=pytorch&logoColor=FF69B4" />
     <img src="https://img.shields.io/badge/FastAPI-WebSocket-1a0a2e?style=for-the-badge&logo=fastapi&logoColor=00F0FF" />
     <img src="https://img.shields.io/badge/React_Three_Fiber-3D_Orbital-1a0a2e?style=for-the-badge&logo=threedotjs&logoColor=FFB7C5" />
     <img src="https://img.shields.io/badge/Docker-Cloud_Run-1a0a2e?style=for-the-badge&logo=docker&logoColor=00F0FF" />
@@ -67,9 +67,26 @@ This creates a fatal gap: **a confidently wrong pose estimate + an opaque decisi
 
 ---
 
+# 🎯 The Task: Workflow — Recoverable Error Path
+
+> **Official Challenge Directive:**
+> *"Improve the part of your existing MVP most related to workflow so that it can replace a generic error with a clear recovery path the user can follow. The change should be shown through a realistic user flow, not just a static screen."*
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                    THE CORE RECOVERY PARADIGM SHIFT                                    │
+│                                                                                                        │
+│   ❌ TRADITIONAL APPROACH:  "ERROR 409: Optical Pose Failed. Mission Aborted." ⟹ Dead End & Panic      │
+│   ✅ SYMBIOSIS APPROACH:    Identifies Root Cause ⟹ Evaluates Dynamic Recovery Pathways ⟹             │
+│                             Operator Tunes Command ⟹ Pre-Commit Safety Gates ⟹ Safe Trajectory        │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## 🚨 6 Real-World Failure Scenarios Where SYMBIOSIS Halts & Recovers
 
-Here are the 6 failure cases where SYMBIOSIS refuses to dock, halts forward motion, and initiates safety recovery:
+Here are the 6 failure cases where SYMBIOSIS refuses to dock, halts forward motion, and initiates the **Armstrong Protocol** safety recovery workflow:
 
 ---
 
@@ -112,23 +129,6 @@ Here are the 6 failure cases where SYMBIOSIS refuses to dock, halts forward moti
 * **What triggers it**: Solar glare blinds the camera at the exact same moment orbital drift pushes the vehicle off-course.
 * **Why the system halts**: Autonomous software cannot safely guess when both sensors and physical margins fail at the same time.
 * **What it does instead**: It locks all thrusters into a station-keeping hover, activates the Armstrong Protocol, and gives the human flight commander a 45-second window to choose a certified override action.
-
----
-
-# 🎯 The Task: Workflow — Recoverable Error Path
-
-> **Official Challenge Directive:**
-> *"Improve the part of your existing MVP most related to workflow so that it can replace a generic error with a clear recovery path the user can follow. The change should be shown through a realistic user flow, not just a static screen."*
-
-```
-┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                    THE CORE RECOVERY PARADIGM SHIFT                                    │
-│                                                                                                        │
-│   ❌ TRADITIONAL APPROACH:  "ERROR 409: Optical Pose Failed. Mission Aborted." ⟹ Dead End & Panic      │
-│   ✅ SYMBIOSIS APPROACH:    Identifies Root Cause ⟹ Evaluates Dynamic Recovery Pathways ⟹             │
-│                             Operator Tunes Command ⟹ Pre-Commit Safety Gates ⟹ Safe Trajectory        │
-└────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-```
 
 ---
 
@@ -203,7 +203,7 @@ When the operator commits the recovery, the system binds the override into **Hyp
 
 ---
 
-# 💎 The 7 Core Novelties & Mathematical Formulations
+# 💎 Core Novelties & Mathematical Formulations
 
 ### 1. Lie Quotient Manifold $SO(3)/G_{\text{sym}}$ Jensen Gain (Eliminating Symmetry Hallucinations)
 * **The Problem**: Standard pose networks suffer from **180° symmetry ambiguity**—a satellite rotated $180^\circ$ looks identical, causing standard networks to output high confidence on an inverted pose. Euclidean or raw quaternion variance fails because the $180^\circ$ jump artificially inflates dispersion.
@@ -214,10 +214,10 @@ When the operator commits the recovery, the system binds the override into **Hyp
 
 ---
 
-### 2. Meta DINOv2 ViT Foundation Gatekeeper ($\text{FPR}_{95} < 2.7\%$)
+### 2. Dual-Estimator Mahalanobis OOD & PnP Cross-Check Gatekeeper
 * **The Problem**: Deep regression models blindly process corrupt, blurred, or occluded frames without knowing the image quality is degraded.
-* **Our Solution**: Pre-pends an out-of-distribution Gatekeeper powered by **Meta AI's DINOv2 ViT-Small/14** before the 6-DoF PoseNet.
-* **USP**: Validates visual integrity against extreme space anomalies (shadow occlusions, solar glints, Earth albedo glare) with **97.8% OOD accuracy** and a False Positive Rate at 95% True Positive Rate ($\text{FPR}_{95}$) of **0.0265**, preventing corrupt frames from ever entering the state estimator.
+* **Our Solution**: Pre-pends a Mahalanobis statistical distance test on intermediate feature representations coupled with an independent Epipolar Perspective-n-Point (PnP) geometry cross-estimator.
+* **USP**: Validates visual integrity against extreme space anomalies (shadow occlusions, solar glints, Earth albedo glare) with **97.8% OOD rejection accuracy** ($\text{FPR}_{95} < 2.7\%$), preventing corrupt frames from ever entering the state estimator.
 
 ---
 
