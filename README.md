@@ -5,7 +5,6 @@
 
   <div>
     <img src="https://img.shields.io/badge/Python-3.10+-1a0a2e?style=for-the-badge&logo=python&logoColor=FFB7C5" />
-    <img src="https://img.shields.io/badge/PyTorch-ResNet50-1a0a2e?style=for-the-badge&logo=pytorch&logoColor=FF69B4" />
     <img src="https://img.shields.io/badge/FastAPI-WebSocket-1a0a2e?style=for-the-badge&logo=fastapi&logoColor=00F0FF" />
     <img src="https://img.shields.io/badge/React_Three_Fiber-3D_Orbital-1a0a2e?style=for-the-badge&logo=threedotjs&logoColor=FFB7C5" />
     <img src="https://img.shields.io/badge/Docker-Cloud_Run-1a0a2e?style=for-the-badge&logo=docker&logoColor=00F0FF" />
