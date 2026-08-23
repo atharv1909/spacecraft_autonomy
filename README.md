@@ -185,22 +185,24 @@ graph LR
 * **Our Solution**: Pre-pends a Mahalanobis statistical distance test on intermediate feature representations coupled with an independent Epipolar Perspective-n-Point (PnP) geometry cross-estimator.
 * **USP**: Validates visual integrity against extreme space anomalies (shadow occlusions, solar glints, Earth albedo glare) with **97.8% OOD rejection accuracy** ($\text{FPR}_{95} < 2.7\%$), preventing corrupt frames from ever entering the state estimator.
 
-## 3. Exact Clopper-Pearson 99% Binomial Collision Risk Bounds
+### 3. Exact Clopper-Pearson 99% Binomial Collision Risk Bounds
 
-- **The Problem:** Monte Carlo simulations rely on point estimates ($P = k/n$) or Gaussian approximations, which can dangerously underestimate collision risk in small sample sizes. For example, 0 observed collisions in 100 runs does **not** mean 0% collision risk.
+- **The Problem:** Monte Carlo simulations rely on point estimates (P = k/n) or Gaussian approximations, which can dangerously underestimate collision risk in small sample sizes. For example, 0 observed collisions in 100 runs does **not** mean 0% collision risk.
 
 - **Our Solution:** We compute the exact Clopper-Pearson binomial upper confidence limit using the inverse Beta distribution:
 
-$$
-P_{\mathrm{coll}}^{(99\%)} =
-\operatorname{Beta}^{-1}\left(0.99;\, k+1,\, n-k\right)
-$$
+  `P_coll(99%) = Beta_inverse(0.99, k + 1, n - k)`
 
-- **USP:** Mathematical statistical bounding of flight safety:
-  - $0/100$ observed collisions $\Rightarrow P_{\mathrm{coll}} \leq 4.5\%$
-  - $5/100$ observed collisions $\Rightarrow P_{\mathrm{coll}} \leq 12.6\%$
+  Where:
+  - `k` = number of observed collisions
+  - `n` = total number of simulation runs
+  - `Beta_inverse(q, a, b)` = inverse of the Beta cumulative distribution function
 
-No maneuver is committed without statistically bounded collision risk.
+- **USP:** Statistically rigorous flight-safety bounds:
+  - **0/100 observed collisions → collision probability ≤ 4.5%**
+  - **5/100 observed collisions → collision probability ≤ 12.6%**
+
+**No maneuver is committed without statistically bounded collision risk.**
 
 ### 4. Hyperdimensional Cognition ($D=10,000$) & Pearl's Do-Calculus Fault Isolation
 * **The Problem**: Black-box neural networks cannot diagnose cascading multi-subsystem failures or explain their reasoning.
